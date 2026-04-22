@@ -1,0 +1,641 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B00FB4862F9831710052F38B /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = B00FB4852F9831710052F38B /* Auth */; };
+		B00FB4882F9831710052F38B /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = B00FB4872F9831710052F38B /* PostgREST */; };
+		B00FB48A2F9831710052F38B /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = B00FB4892F9831710052F38B /* Storage */; };
+		B00FB48C2F9831710052F38B /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = B00FB48B2F9831710052F38B /* Supabase */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B00FB4382F9829650052F38B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B00FB4222F9829630052F38B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B00FB4292F9829630052F38B;
+			remoteInfo = DripLog;
+		};
+		B00FB4422F9829650052F38B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B00FB4222F9829630052F38B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B00FB4292F9829630052F38B;
+			remoteInfo = DripLog;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B00FB42A2F9829630052F38B /* DripLog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DripLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00FB4372F9829650052F38B /* DripLogTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DripLogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00FB4412F9829650052F38B /* DripLogUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DripLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		B00FB42C2F9829630052F38B /* DripLog */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DripLog;
+			sourceTree = "<group>";
+		};
+		B00FB43A2F9829650052F38B /* DripLogTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DripLogTests;
+			sourceTree = "<group>";
+		};
+		B00FB4442F9829650052F38B /* DripLogUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DripLogUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B00FB4272F9829630052F38B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00FB48C2F9831710052F38B /* Supabase in Frameworks */,
+				B00FB48A2F9831710052F38B /* Storage in Frameworks */,
+				B00FB4882F9831710052F38B /* PostgREST in Frameworks */,
+				B00FB4862F9831710052F38B /* Auth in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00FB4342F9829650052F38B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00FB43E2F9829650052F38B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B00FB4212F9829630052F38B = {
+			isa = PBXGroup;
+			children = (
+				B00FB42C2F9829630052F38B /* DripLog */,
+				B00FB43A2F9829650052F38B /* DripLogTests */,
+				B00FB4442F9829650052F38B /* DripLogUITests */,
+				B00FB42B2F9829630052F38B /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B00FB42B2F9829630052F38B /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B00FB42A2F9829630052F38B /* DripLog.app */,
+				B00FB4372F9829650052F38B /* DripLogTests.xctest */,
+				B00FB4412F9829650052F38B /* DripLogUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B00FB4292F9829630052F38B /* DripLog */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B00FB44B2F9829650052F38B /* Build configuration list for PBXNativeTarget "DripLog" */;
+			buildPhases = (
+				B00FB4262F9829630052F38B /* Sources */,
+				B00FB4272F9829630052F38B /* Frameworks */,
+				B00FB4282F9829630052F38B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B00FB42C2F9829630052F38B /* DripLog */,
+			);
+			name = DripLog;
+			packageProductDependencies = (
+				B00FB4852F9831710052F38B /* Auth */,
+				B00FB4872F9831710052F38B /* PostgREST */,
+				B00FB4892F9831710052F38B /* Storage */,
+				B00FB48B2F9831710052F38B /* Supabase */,
+			);
+			productName = DripLog;
+			productReference = B00FB42A2F9829630052F38B /* DripLog.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B00FB4362F9829650052F38B /* DripLogTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B00FB44E2F9829650052F38B /* Build configuration list for PBXNativeTarget "DripLogTests" */;
+			buildPhases = (
+				B00FB4332F9829650052F38B /* Sources */,
+				B00FB4342F9829650052F38B /* Frameworks */,
+				B00FB4352F9829650052F38B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B00FB4392F9829650052F38B /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B00FB43A2F9829650052F38B /* DripLogTests */,
+			);
+			name = DripLogTests;
+			packageProductDependencies = (
+			);
+			productName = DripLogTests;
+			productReference = B00FB4372F9829650052F38B /* DripLogTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		B00FB4402F9829650052F38B /* DripLogUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B00FB4512F9829650052F38B /* Build configuration list for PBXNativeTarget "DripLogUITests" */;
+			buildPhases = (
+				B00FB43D2F9829650052F38B /* Sources */,
+				B00FB43E2F9829650052F38B /* Frameworks */,
+				B00FB43F2F9829650052F38B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B00FB4432F9829650052F38B /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B00FB4442F9829650052F38B /* DripLogUITests */,
+			);
+			name = DripLogUITests;
+			packageProductDependencies = (
+			);
+			productName = DripLogUITests;
+			productReference = B00FB4412F9829650052F38B /* DripLogUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		B00FB4222F9829630052F38B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					B00FB4292F9829630052F38B = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					B00FB4362F9829650052F38B = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = B00FB4292F9829630052F38B;
+					};
+					B00FB4402F9829650052F38B = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = B00FB4292F9829630052F38B;
+					};
+				};
+			};
+			buildConfigurationList = B00FB4252F9829630052F38B /* Build configuration list for PBXProject "DripLog" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = B00FB4212F9829630052F38B;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B00FB4842F9831710052F38B /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = B00FB42B2F9829630052F38B /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				B00FB4292F9829630052F38B /* DripLog */,
+				B00FB4362F9829650052F38B /* DripLogTests */,
+				B00FB4402F9829650052F38B /* DripLogUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B00FB4282F9829630052F38B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00FB4352F9829650052F38B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00FB43F2F9829650052F38B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B00FB4262F9829630052F38B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00FB4332F9829650052F38B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B00FB43D2F9829650052F38B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B00FB4392F9829650052F38B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B00FB4292F9829630052F38B /* DripLog */;
+			targetProxy = B00FB4382F9829650052F38B /* PBXContainerItemProxy */;
+		};
+		B00FB4432F9829650052F38B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B00FB4292F9829630052F38B /* DripLog */;
+			targetProxy = B00FB4422F9829650052F38B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		B00FB4492F9829650052F38B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = MFN268BCDH;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B00FB44A2F9829650052F38B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = MFN268BCDH;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B00FB44C2F9829650052F38B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MFN268BCDH;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take outfit photos to save to your profile.";
+				INFOPLIST_KEY_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvd2ZnZGxjcXRncHJhaXptb29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTc2MDUsImV4cCI6MjA5MjM3MzYwNX0.rW8Ug2NAMaMsTD_WTVzllpZ_Yc3kBohpsD0u6wYyWGc";
+				INFOPLIST_KEY_SUPABASE_URL = "https://yowfgdlcqtgpraizmoom.supabase.co";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Michael-Suarez-Russell.DripLog";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B00FB44D2F9829650052F38B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MFN268BCDH;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Take outfit photos to save to your profile.";
+				INFOPLIST_KEY_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvd2ZnZGxjcXRncHJhaXptb29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTc2MDUsImV4cCI6MjA5MjM3MzYwNX0.rW8Ug2NAMaMsTD_WTVzllpZ_Yc3kBohpsD0u6wYyWGc";
+				INFOPLIST_KEY_SUPABASE_URL = "https://yowfgdlcqtgpraizmoom.supabase.co";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Michael-Suarez-Russell.DripLog";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B00FB44F2F9829650052F38B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MFN268BCDH;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Michael-Suarez-Russell.DripLogTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DripLog.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DripLog";
+			};
+			name = Debug;
+		};
+		B00FB4502F9829650052F38B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MFN268BCDH;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Michael-Suarez-Russell.DripLogTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DripLog.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DripLog";
+			};
+			name = Release;
+		};
+		B00FB4522F9829650052F38B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MFN268BCDH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Michael-Suarez-Russell.DripLogUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = DripLog;
+			};
+			name = Debug;
+		};
+		B00FB4532F9829650052F38B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = MFN268BCDH;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Michael-Suarez-Russell.DripLogUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = DripLog;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B00FB4252F9829630052F38B /* Build configuration list for PBXProject "DripLog" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B00FB4492F9829650052F38B /* Debug */,
+				B00FB44A2F9829650052F38B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B00FB44B2F9829650052F38B /* Build configuration list for PBXNativeTarget "DripLog" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B00FB44C2F9829650052F38B /* Debug */,
+				B00FB44D2F9829650052F38B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B00FB44E2F9829650052F38B /* Build configuration list for PBXNativeTarget "DripLogTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B00FB44F2F9829650052F38B /* Debug */,
+				B00FB4502F9829650052F38B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B00FB4512F9829650052F38B /* Build configuration list for PBXNativeTarget "DripLogUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B00FB4522F9829650052F38B /* Debug */,
+				B00FB4532F9829650052F38B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B00FB4842F9831710052F38B /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B00FB4852F9831710052F38B /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B00FB4842F9831710052F38B /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		B00FB4872F9831710052F38B /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B00FB4842F9831710052F38B /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		B00FB4892F9831710052F38B /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B00FB4842F9831710052F38B /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		B00FB48B2F9831710052F38B /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B00FB4842F9831710052F38B /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = B00FB4222F9829630052F38B /* Project object */;
+}
