@@ -2,7 +2,7 @@
 //  AuthViewModel.swift
 //  DripLog
 //
-//  Created by Michael Suarez-Russell on 4/21/26.
+//  Account/AuthViewModel.swift
 //
 
 import Combine
@@ -10,14 +10,9 @@ import Foundation
 
 @MainActor
 final class AuthViewModel: ObservableObject {
-    enum Mode: String, CaseIterable, Identifiable {
-        case signUp = "Sign Up"
-        case logIn = "Log In"
 
-        var id: String { rawValue }
-    }
+    // MARK: - Published state
 
-    @Published var mode: Mode = .signUp
     @Published var name = ""
     @Published var email = ""
     @Published var password = ""
@@ -27,19 +22,21 @@ final class AuthViewModel: ObservableObject {
     @Published var isWorking = false
     @Published var isCheckingSession = false
 
+    /// True only when the user just completed a brand-new sign-up in this
+    /// session. Used by ContentView to decide whether to show onboarding.
+    @Published var isNewUser = false
+
     private var authService: AuthServicing?
 
     init(authService: AuthServicing? = nil) {
         self.authService = authService
     }
 
-    var isAuthenticated: Bool {
-        currentUser != nil
-    }
+    // MARK: - Computed
 
-    var primaryButtonTitle: String {
-        isWorking ? "Please wait..." : mode.rawValue
-    }
+    var isAuthenticated: Bool { currentUser != nil }
+
+    // MARK: - Session restore
 
     func loadCurrentUserIfNeeded() {
         guard currentUser == nil, !isCheckingSession else { return }
@@ -49,15 +46,18 @@ final class AuthViewModel: ObservableObject {
             defer { isCheckingSession = false }
 
             do {
+                // Returning users are never treated as new — onboarding is skipped.
                 currentUser = try await service().currentUser()
+                isNewUser = false
             } catch {
-                // Do not block the auth screen if session restore fails.
                 currentUser = nil
             }
         }
     }
 
-    func submit() {
+    // MARK: - Auth actions
+
+    func signUp() {
         errorMessage = nil
 
         Task {
@@ -65,16 +65,27 @@ final class AuthViewModel: ObservableObject {
             defer { isWorking = false }
 
             do {
-                switch mode {
-                case .signUp:
-                    guard password == confirmPassword else {
-                        throw AuthError.passwordMismatch
-                    }
-
-                    currentUser = try await service().signUp(name: name, email: email, password: password)
-                case .logIn:
-                    currentUser = try await service().logIn(email: email, password: password)
+                guard password == confirmPassword else {
+                    throw AuthError.passwordMismatch
                 }
+                currentUser = try await service().signUp(name: name, email: email, password: password)
+                isNewUser = true   // ← show onboarding after this
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
+            }
+        }
+    }
+
+    func logIn() {
+        errorMessage = nil
+
+        Task {
+            isWorking = true
+            defer { isWorking = false }
+
+            do {
+                currentUser = try await service().logIn(email: email, password: password)
+                isNewUser = false  // ← skip onboarding, go straight to Home
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
             }
@@ -86,6 +97,7 @@ final class AuthViewModel: ObservableObject {
             do {
                 try await service().logOut()
                 currentUser = nil
+                isNewUser = false
                 password = ""
                 confirmPassword = ""
             } catch {
@@ -94,13 +106,12 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
-    private func service() throws -> AuthServicing {
-        if let authService {
-            return authService
-        }
+    // MARK: - Private
 
-        let createdService = try SupabaseAuthService()
-        authService = createdService
-        return createdService
+    private func service() throws -> AuthServicing {
+        if let authService { return authService }
+        let created = try SupabaseAuthService()
+        authService = created
+        return created
     }
 }
