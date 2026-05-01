@@ -10,9 +10,7 @@ import UIKit
 
 struct AuthView: View {
     @ObservedObject var viewModel: AuthViewModel
-    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
-    @State private var stage: Stage = .tutorial
-    @State private var tutorialIndex = 0
+    @State private var stage: Stage = .welcome
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -23,7 +21,6 @@ struct AuthView: View {
     }
     
     private enum Stage {
-        case tutorial
         case welcome
         case signUp
         case signIn
@@ -35,8 +32,6 @@ struct AuthView: View {
                 .ignoresSafeArea()
 
             switch stage {
-            case .tutorial:
-                tutorialView
             case .welcome:
                 welcomeView
             case .signUp:
@@ -63,53 +58,6 @@ struct AuthView: View {
                         stage = .signUp
                     }
                 )
-            }
-        }
-        .onAppear(perform: syncInitialStage)
-    }
-    
-    private func syncInitialStage() {
-        if hasSeenOnboarding {
-            stage = viewModel.mode == .signUp ? .signUp : .signIn
-        } else {
-            stage = .tutorial
-        }
-    }
-
-    private var tutorialView: some View {
-        VStack(alignment: .leading) {
-            HStack(spacing: 12) {
-                ForEach(0..<3, id: \.self) { index in
-                    Rectangle()
-                        .fill(index <= tutorialIndex ? Color.black.opacity(0.3) : Color.black.opacity(0.15))
-                        .frame(height: 3)
-                }
-            }
-            .padding(.top, 70)
-            .padding(.horizontal, 40)
-
-            Spacer()
-            
-            Text(tutorialPages[tutorialIndex])
-                .font(.system(size: 54, weight: .bold))
-                .minimumScaleFactor(0.7)
-                .lineLimit(2)
-                .padding(.horizontal, 40)
-            
-            Spacer()
-            
-            HStack {
-                Spacer()
-                Button(action: nextTutorialPage) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 70, height: 70)
-                        .background(Color.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, 54)
-                .padding(.bottom, 67)
             }
         }
     }
@@ -143,13 +91,11 @@ struct AuthView: View {
                             .padding(.bottom, 22)
                         
                         onboardingButton(title: "Get Started", action: {
-                            hasSeenOnboarding = true
                             viewModel.mode = .signUp
                             stage = .signUp
                         })
                         
                         onboardingButton(title: "Sign in", action: {
-                            hasSeenOnboarding = true
                             viewModel.mode = .logIn
                             stage = .signIn
                         })
@@ -287,14 +233,6 @@ struct AuthView: View {
             .padding(.horizontal, 30)
         }
     }
-    
-    private func nextTutorialPage() {
-        if tutorialIndex < tutorialPages.count - 1 {
-            tutorialIndex += 1
-        } else {
-            stage = .welcome
-        }
-    }
 
     private func moveToNextField() {
         switch focusedField {
@@ -308,14 +246,6 @@ struct AuthView: View {
             focusedField = nil
             viewModel.submit()
         }
-    }
-    
-    private var tutorialPages: [String] {
-        [
-            "Your closet,\nbut digital",
-            "See your\nfriends’ fits",
-            "Get AI\noutfit inspo"
-        ]
     }
 }
 

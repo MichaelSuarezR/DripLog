@@ -26,6 +26,7 @@ final class AuthViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isWorking = false
     @Published var isCheckingSession = false
+    @Published var isNewUser = false
 
     private var authService: AuthServicing?
 
@@ -50,9 +51,11 @@ final class AuthViewModel: ObservableObject {
 
             do {
                 currentUser = try await service().currentUser()
+                isNewUser = false
             } catch {
                 // Do not block the auth screen if session restore fails.
                 currentUser = nil
+                isNewUser = false
             }
         }
     }
@@ -72,8 +75,10 @@ final class AuthViewModel: ObservableObject {
                     }
 
                     currentUser = try await service().signUp(name: name, email: email, password: password)
+                    isNewUser = true
                 case .logIn:
                     currentUser = try await service().logIn(email: email, password: password)
+                    isNewUser = false
                 }
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
@@ -86,12 +91,17 @@ final class AuthViewModel: ObservableObject {
             do {
                 try await service().logOut()
                 currentUser = nil
+                isNewUser = false
                 password = ""
                 confirmPassword = ""
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not log out."
             }
         }
+    }
+
+    func completeOnboarding() {
+        isNewUser = false
     }
 
     private func service() throws -> AuthServicing {
