@@ -126,16 +126,65 @@ private struct HomeTab: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Welcome\(user.name.isEmpty ? "" : ", \(user.name)")")
-                    .font(.largeTitle.bold())
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Your Feed")
+                        .font(.largeTitle.bold())
+                    
+                    Text("Welcome\(user.name.isEmpty ? "" : ", \(user.name)")")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    
+                    ForEach(0..<4, id: \.self) { _ in
+                        FeedPlaceholderCard()
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(24)
+            }
+            .navigationTitle("Feed")
+        }
+    }
+}
 
+private struct FeedPlaceholderCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(Color.black.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.black.opacity(0.12))
+                    .frame(width: 120, height: 14)
+                
                 Spacer()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(24)
-            .navigationTitle("Home")
+            
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.black.opacity(0.08))
+                .frame(height: 280)
+            
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.black.opacity(0.1))
+                .frame(width: 220, height: 12)
+            
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.black.opacity(0.1))
+                .frame(width: 160, height: 12)
+            
+            HStack(spacing: 14) {
+                ForEach(0..<3, id: \.self) { _ in
+                    Circle()
+                        .fill(Color.black.opacity(0.1))
+                        .frame(width: 24, height: 24)
+                }
+            }
+            .padding(.top, 4)
         }
+        .padding(14)
+        .background(Color.black.opacity(0.03), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
