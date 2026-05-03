@@ -15,39 +15,27 @@ struct HomeView: View {
     let user: AppUser
     let onLogOut: () -> Void
 
-    @State private var selectedTab: AppTab = .home
+    @State private var selectedTab: AppTab = .feed
     @State private var pendingOutfitDraft: PendingOutfitDraft?
+    @State private var editingOutfit: OutfitPhoto?
     @State private var outfitPhotos: [OutfitPhoto] = []
     @State private var outfitErrorMessage: String?
     @State private var isUploadingOutfit = false
     @State private var didLoadOutfits = false
     @State private var outfitService: OutfitServicing?
+    @State private var suggestionService: SuggestionServicing?
+    @State private var isSuggestionsPresented = false
+    @State private var isLoadingSuggestions = false
+    @State private var suggestions: OutfitSuggestions?
+    @State private var suggestionErrorMessage: String?
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            HomeTab(user: user)
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
-                }
-                .tag(AppTab.home)
+        ZStack(alignment: .bottom) {
+            selectedTabView
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            CreateTab(
-                isUploading: isUploadingOutfit,
-                errorMessage: outfitErrorMessage,
-                onCapture: prepareOutfit
-            )
-            .tabItem {
-                Label("Add", systemImage: "plus.circle.fill")
-            }
-            .tag(AppTab.add)
-
-            ProfileTab(user: user, outfitPhotos: outfitPhotos, onLogOut: onLogOut)
-                .tabItem {
-                    Label("Profile", systemImage: "person.crop.circle.fill")
-                }
-                .tag(AppTab.profile)
+            CustomTabBar(selectedTab: $selectedTab)
         }
-        .tint(Color(red: 0.08, green: 0.34, blue: 0.27))
         .task {
             await loadOutfitsIfNeeded()
         }
@@ -58,10 +46,54 @@ struct HomeView: View {
                 onCancel: {
                     pendingOutfitDraft = nil
                 },
-                onSave: { tags in
-                    uploadOutfit(draft.image, tags: tags)
+                onSave: { metadata in
+                    uploadOutfit(draft.image, metadata: metadata)
                 }
             )
+        }
+        .fullScreenCover(item: $editingOutfit) { photo in
+            OutfitEditView(
+                photo: photo,
+                onClose: { metadata in
+                    await updateOutfitMetadata(metadata, for: photo.id)
+                },
+                onDelete: {
+                    await deleteOutfit(photo)
+                }
+            )
+        }
+        .fullScreenCover(isPresented: $isSuggestionsPresented) {
+            SuggestionsView(
+                suggestions: suggestions,
+                isLoading: isLoadingSuggestions,
+                errorMessage: suggestionErrorMessage,
+                onClose: {
+                    isSuggestionsPresented = false
+                },
+                onRetry: prepareSuggestions
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var selectedTabView: some View {
+        switch selectedTab {
+        case .closet:
+            ProfileTab(
+                user: user,
+                outfitPhotos: outfitPhotos,
+                onLogOut: onLogOut,
+                onEditOutfit: { editingOutfit = $0 },
+                onAskForSuggestions: prepareSuggestions
+            )
+        case .add:
+            CreateTab(
+                isUploading: isUploadingOutfit,
+                errorMessage: outfitErrorMessage,
+                onCapture: prepareOutfit
+            )
+        case .feed:
+            HomeTab(user: user)
         }
     }
 
@@ -81,21 +113,71 @@ struct HomeView: View {
         pendingOutfitDraft = PendingOutfitDraft(image: image)
     }
 
-    private func uploadOutfit(_ image: UIImage, tags: [String]) {
+    private func uploadOutfit(_ image: UIImage, metadata: OutfitMetadata) {
         Task {
             isUploadingOutfit = true
             outfitErrorMessage = nil
             defer { isUploadingOutfit = false }
 
             do {
-                let photo = try await service().uploadOutfit(image, tags: tags, for: user.id)
+                let photo = try await service().uploadOutfit(image, metadata: metadata, for: user.id)
                 outfitPhotos.insert(photo, at: 0)
                 pendingOutfitDraft = nil
-                selectedTab = .profile
+                selectedTab = .closet
             } catch {
                 outfitErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not save outfit photo."
                 selectedTab = .add
             }
+        }
+    }
+
+    private func updateOutfitMetadata(_ metadata: OutfitMetadata, for outfitID: UUID) async {
+        do {
+            try await service().updateOutfitMetadata(metadata, for: outfitID)
+
+            if let index = outfitPhotos.firstIndex(where: { $0.id == outfitID }) {
+                let existing = outfitPhotos[index]
+                outfitPhotos[index] = OutfitPhoto(
+                    id: existing.id,
+                    imagePath: existing.imagePath,
+                    image: existing.image,
+                    tags: metadata.allTags,
+                    customTags: metadata.customTags,
+                    categories: metadata.categories,
+                    weather: metadata.weather,
+                    occasion: metadata.occasion,
+                    colors: metadata.colors
+                )
+            }
+        } catch {
+            outfitErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not update outfit details."
+        }
+    }
+
+    private func deleteOutfit(_ photo: OutfitPhoto) async {
+        do {
+            try await service().deleteOutfit(photo)
+            outfitPhotos.removeAll { $0.id == photo.id }
+            editingOutfit = nil
+        } catch {
+            outfitErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not delete outfit."
+        }
+    }
+
+    private func prepareSuggestions() {
+        isSuggestionsPresented = true
+        isLoadingSuggestions = true
+        suggestionErrorMessage = nil
+        suggestions = nil
+
+        Task {
+            do {
+                suggestions = try await suggestionProvider().makeSuggestions(for: user, outfitPhotos: outfitPhotos)
+            } catch {
+                suggestionErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not build suggestions right now."
+            }
+
+            isLoadingSuggestions = false
         }
     }
 
@@ -108,17 +190,100 @@ struct HomeView: View {
         outfitService = createdService
         return createdService
     }
+
+    private func suggestionProvider() throws -> SuggestionServicing {
+        if let suggestionService {
+            return suggestionService
+        }
+
+        let createdService = try SupabaseSuggestionService()
+        suggestionService = createdService
+        return createdService
+    }
 }
 
 private enum AppTab {
-    case home
+    case closet
     case add
-    case profile
+    case feed
 }
 
 private struct PendingOutfitDraft: Identifiable {
     let id = UUID()
     let image: UIImage
+}
+
+private struct CustomTabBar: View {
+    @Binding var selectedTab: AppTab
+
+    private let barWidth: CGFloat = 334
+    private let barHeight: CGFloat = 59
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Image("CustomTabBarBackground")
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFit()
+                .frame(width: barWidth, height: barHeight)
+
+            HStack {
+                tabButton(imageName: "ClosetTabIcon", tab: .closet)
+                Spacer()
+                tabButton(imageName: "FeedTabIcon", tab: .feed)
+            }
+            .padding(.horizontal, 52)
+            .frame(width: barWidth, height: barHeight)
+
+            Button {
+                selectedTab = .add
+            } label: {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 46, height: 46)
+                    .overlay {
+                        Image("AddTabIcon")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 18, height: 18)
+                            .foregroundStyle(iconColor(for: .add))
+                    }
+                    .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
+            }
+            .offset(y: -6)
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
+        .background(alignment: .bottom) {
+            Color.white
+                .frame(height: 24)
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private func tabButton(imageName: String, tab: AppTab) -> some View {
+        Button {
+            selectedTab = tab
+        } label: {
+            Image(imageName)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: tab == .closet ? 18 : 21, height: 18)
+                .foregroundStyle(iconColor(for: tab))
+                .frame(width: 48, height: 48)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func iconColor(for tab: AppTab) -> Color {
+        selectedTab == tab
+            ? Color(red: 0.08, green: 0.34, blue: 0.27)
+            : Color(red: 0.42, green: 0.45, blue: 0.50)
+    }
 }
 
 private struct HomeTab: View {
@@ -343,81 +508,1306 @@ private struct ProfileTab: View {
     let user: AppUser
     let outfitPhotos: [OutfitPhoto]
     let onLogOut: () -> Void
+    let onEditOutfit: (OutfitPhoto) -> Void
+    let onAskForSuggestions: () -> Void
+
+    @State private var isFilterPresented = false
+    @State private var filters = ClosetFilters()
 
     private let columns = [
-        GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10)
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14)
     ]
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    profileHeader
+                VStack(alignment: .leading, spacing: 18) {
+                    headerRow
+                    inspirationBanner
+                    closetHeader
                     outfitsSection
-
-                    Button("Log Out", action: onLogOut)
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color(red: 0.08, green: 0.34, blue: 0.27))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(24)
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 110)
             }
-            .navigationTitle("Profile")
+            .background(Color.white)
+            .toolbar(.hidden, for: .navigationBar)
+            .fullScreenCover(isPresented: $isFilterPresented) {
+                ClosetFilterView(filters: $filters)
+            }
         }
     }
 
-    private var profileHeader: some View {
-        HStack(spacing: 16) {
-            Image(systemName: "person.crop.circle.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(Color(red: 0.08, green: 0.34, blue: 0.27))
+    private var headerRow: some View {
+        HStack(alignment: .bottom) {
+            Text("Hello, \(displayName)")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(.black)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(user.name.isEmpty ? "Profile" : user.name)
-                    .font(.title.bold())
+            Spacer()
 
-                Text(user.email)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 10) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.black.opacity(0.14))
+                    .frame(width: 22, height: 22)
+
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.black.opacity(0.14))
+                    .frame(width: 22, height: 22)
+
+                Menu {
+                    Button("Log Out", role: .destructive, action: onLogOut)
+                } label: {
+                    Circle()
+                        .fill(Color.black.opacity(0.14))
+                        .frame(width: 30, height: 30)
+                }
+            }
+        }
+        .padding(.top, 12)
+    }
+
+    private var inspirationBanner: some View {
+        Button {
+            onAskForSuggestions()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(Color.white.opacity(0.16), in: Circle())
+
+                Text("don't know what to wear?")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+
+                Spacer()
+            }
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.70, green: 0.68, blue: 0.69),
+                        Color(red: 0.62, green: 0.60, blue: 0.61)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var closetHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("My Closet")
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundStyle(.black)
+
+            HStack {
+                Spacer()
+                Button("Filter") {
+                    isFilterPresented = true
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.black)
+                .frame(width: 98, height: 34)
+                .background(Color.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Spacer()
             }
         }
     }
 
     private var outfitsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Outfits")
-                .font(.title2.bold())
-
-            if outfitPhotos.isEmpty {
-                ContentUnavailableView(
-                    "No outfits yet",
-                    systemImage: "camera",
-                    description: Text("Tap Add and take your first outfit photo.")
-                )
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
+        LazyVGrid(columns: columns, spacing: 12) {
+            if filteredOutfits.isEmpty {
+                ForEach(0..<6, id: \.self) { _ in
+                    closetPlaceholderCard
+                }
             } else {
-                LazyVGrid(columns: columns, spacing: 10) {
-                    ForEach(outfitPhotos) { photo in
-                        VStack(alignment: .leading, spacing: 8) {
+                ForEach(filteredOutfits) { photo in
+                    VStack(alignment: .leading, spacing: 6) {
+                        ZStack(alignment: .topTrailing) {
                             Image(uiImage: photo.image)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(height: 220)
-                                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                .frame(height: 172)
+                                .frame(maxWidth: .infinity)
+                                .background(Color.black.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                                 .clipped()
 
-                            if !photo.tags.isEmpty {
-                                Text(photo.tags.joined(separator: ", "))
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(2)
+                            Button {
+                                onEditOutfit(photo)
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.black)
+                                    .rotationEffect(.degrees(90))
+                                    .frame(width: 34, height: 34)
+                                    .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+                            .padding(.top, 6)
+                            .padding(.trailing, 6)
+                            .zIndex(1)
+                        }
+
+                        if !photo.tags.isEmpty {
+                            Text(photo.tags.joined(separator: ", "))
+                                .font(.caption)
+                                .foregroundStyle(.black.opacity(0.72))
+                                .lineLimit(1)
                         }
                     }
                 }
             }
+        }
+    }
+
+    private var closetPlaceholderCard: some View {
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(Color.black.opacity(0.10))
+                .frame(height: 172)
+
+            Image(systemName: "ellipsis")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.black)
+                .rotationEffect(.degrees(90))
+                .frame(width: 34, height: 34)
+                .padding(.top, 6)
+                .padding(.trailing, 6)
+        }
+    }
+
+    private var displayName: String {
+        let trimmedName = user.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedName.isEmpty ? "Matthew" : trimmedName
+    }
+
+    private var filteredOutfits: [OutfitPhoto] {
+        guard filters.hasActiveSelections else { return outfitPhotos }
+
+        return outfitPhotos.filter { photo in
+            let normalizedTags = Set(photo.tags.map { $0.lowercased() })
+
+            if !filters.categoryMatches(tags: normalizedTags) {
+                return false
+            }
+
+            if !filters.weather.isEmpty && normalizedTags.isDisjoint(with: filters.weatherNormalized) {
+                return false
+            }
+
+            if !filters.occasion.isEmpty && normalizedTags.isDisjoint(with: filters.occasionNormalized) {
+                return false
+            }
+
+            if !filters.colors.isEmpty && normalizedTags.isDisjoint(with: filters.colorsNormalized) {
+                return false
+            }
+
+            if !filters.custom.isEmpty && normalizedTags.isDisjoint(with: filters.customNormalized) {
+                return false
+            }
+
+            return true
+        }
+    }
+}
+
+private struct SuggestionsView: View {
+    let suggestions: OutfitSuggestions?
+    let isLoading: Bool
+    let errorMessage: String?
+    let onClose: () -> Void
+    let onRetry: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 28) {
+                header
+
+                if isLoading {
+                    VStack(spacing: 16) {
+                        Spacer()
+                        ProgressView("Building suggestions...")
+                            .font(.headline)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let errorMessage {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Spacer()
+                        Text(errorMessage)
+                            .font(.headline)
+                            .foregroundStyle(.black)
+                        Button("Try Again") {
+                            onRetry()
+                        }
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Color.black, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
+                } else if let suggestions {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 22) {
+                            Text("Randomized Outfits")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.black)
+                                .padding(.horizontal, 20)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 18) {
+                                    closetSuggestionCard(
+                                        image: suggestions.leftOutfit.image,
+                                        title: "Your Closet",
+                                        detail: cardDetail(for: suggestions.leftOutfit.tags)
+                                    )
+
+                                    inspirationSuggestionCard(look: suggestions.centerInspiration)
+
+                                    closetSuggestionCard(
+                                        image: suggestions.rightOutfit.image,
+                                        title: "Your Closet",
+                                        detail: cardDetail(for: suggestions.rightOutfit.tags)
+                                    )
+                                }
+                                .padding(.horizontal, 18)
+                            }
+
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Why it works")
+                                    .font(.system(size: 18, weight: .semibold))
+                                Text(suggestions.explanation)
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.black.opacity(0.68))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(.horizontal, 20)
+
+                            weatherCard(for: suggestions.weather)
+                                .padding(.horizontal, 20)
+                        }
+                        .padding(.bottom, 40)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color.white)
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private var header: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 0, style: .continuous)
+                .fill(Color.black.opacity(0.10))
+                .frame(height: 71)
+
+            HStack {
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle")
+                        .font(.system(size: 21))
+                        .foregroundStyle(.black)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("Suggestions")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.black)
+
+                Spacer()
+
+                Color.clear
+                    .frame(width: 21, height: 21)
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    private func closetSuggestionCard(image: UIImage, title: String, detail: String) -> some View {
+        VStack(spacing: 12) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 286, height: 376)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipped()
+
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                Text(detail)
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Color.black.opacity(0.68))
+                    .frame(width: 250)
+            }
+        }
+    }
+
+    private func inspirationSuggestionCard(look: InspirationLook) -> some View {
+        VStack(spacing: 12) {
+            AsyncImage(url: look.imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure(_):
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.black.opacity(0.10))
+                        .overlay {
+                            Image(systemName: "photo")
+                                .font(.title)
+                                .foregroundStyle(.black.opacity(0.28))
+                        }
+                case .empty:
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.black.opacity(0.08))
+                        .overlay {
+                            ProgressView()
+                        }
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .frame(width: 286, height: 376)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            VStack(spacing: 6) {
+                Text("Inspiration")
+                    .font(.headline.weight(.semibold))
+                Text(cardDetail(for: look.categories))
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Color.black.opacity(0.68))
+                    .frame(width: 250)
+            }
+        }
+    }
+
+    private func weatherCard(for weather: WeatherSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Weather Context")
+                .font(.headline.weight(.semibold))
+            if let locationName = weather.locationName, !locationName.isEmpty {
+                Text(locationName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.black.opacity(0.55))
+            }
+            Text("\(weather.summary) \(weather.temperatureText)")
+                .font(.footnote)
+                .foregroundStyle(Color.black.opacity(0.68))
+            Text(weather.tags.joined(separator: " • "))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color(red: 0.08, green: 0.34, blue: 0.27))
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func cardDetail(for tags: [String]) -> String {
+        let trimmed = tags
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if trimmed.isEmpty {
+            return "A clean option from your closet."
+        }
+
+        return trimmed.prefix(3).joined(separator: " • ")
+    }
+}
+
+private struct ClosetFilterView: View {
+    @Binding var filters: ClosetFilters
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var expandedSections: Set<ClosetFilterSection> = [
+        .rating,
+        .categories,
+        .weather
+    ]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    header
+                    filterSection(
+                        title: "Rating",
+                        placeholder: "Give a rating",
+                        section: .rating
+                    ) {
+                        ratingRow
+                    }
+
+                    filterSection(
+                        title: "Categories",
+                        placeholder: "Choose a category",
+                        section: .categories
+                    ) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            ForEach(ClosetCategoryGroup.allCases) { group in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    categoryGroupChip(group.title, isSelected: true)
+                                    chipGrid(items: group.items, selected: binding(for: group))
+                                }
+                            }
+
+                            clearButton {
+                                filters.clearCategories()
+                            }
+                        }
+                    }
+
+                    filterSection(
+                        title: "Weather",
+                        placeholder: "Choose the weather",
+                        section: .weather
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            chipGrid(items: ClosetFilters.weatherOptions, selected: $filters.weather)
+                            clearButton {
+                                filters.weather.removeAll()
+                            }
+                        }
+                    }
+
+                    filterSection(
+                        title: "Occasion",
+                        placeholder: "Choose the occassion",
+                        section: .occasion
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            chipGrid(items: ClosetFilters.occasionOptions, selected: $filters.occasion)
+                            clearButton {
+                                filters.occasion.removeAll()
+                            }
+                        }
+                    }
+
+                    filterSection(
+                        title: "Colors",
+                        placeholder: "Choose the colors",
+                        section: .colors
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            chipGrid(items: ClosetFilters.colorOptions, selected: $filters.colors)
+                            clearButton {
+                                filters.colors.removeAll()
+                            }
+                        }
+                    }
+
+                    filterSection(
+                        title: "Custom",
+                        placeholder: "Choose your custom tags",
+                        section: .custom
+                    ) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            chipGrid(items: filters.customSuggestions, selected: $filters.custom)
+                            clearButton {
+                                filters.custom.removeAll()
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+                .padding(.bottom, 32)
+            }
+            .background(Color.white)
+        }
+    }
+
+    private var header: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.black.opacity(0.10))
+                .frame(height: 56)
+
+            Text("Filter")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.black)
+
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle")
+                        .font(.title3)
+                        .foregroundStyle(.black)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+        }
+    }
+
+    private var ratingRow: some View {
+        HStack(spacing: 8) {
+            ForEach(1...5, id: \.self) { value in
+                Button {
+                    filters.rating = filters.rating == value ? nil : value
+                } label: {
+                    Image(systemName: value <= (filters.rating ?? 0) ? "star.fill" : "star.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(value <= (filters.rating ?? 0) ? Color(red: 1.0, green: 0.84, blue: 0.24) : Color.black.opacity(0.18))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func filterSection<Content: View>(
+        title: String,
+        placeholder: String,
+        section: ClosetFilterSection,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                toggle(section)
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.black)
+
+                    Spacer()
+
+                    Text(sectionSummary(for: section).isEmpty ? placeholder : sectionSummary(for: section))
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(sectionSummary(for: section).isEmpty ? Color.black.opacity(0.35) : .black)
+
+                    Image(systemName: expandedSections.contains(section) ? "chevron.up" : "chevron.down")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.black)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if expandedSections.contains(section) {
+                content()
+                    .padding(.leading, 10)
+            }
+        }
+    }
+
+    private func chipGrid(items: [String], selected: Binding<Set<String>>) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 64, maximum: 132), spacing: 8)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(items, id: \.self) { item in
+                let isSelected = selected.wrappedValue.contains(item)
+
+                Button {
+                    if isSelected {
+                        selected.wrappedValue.remove(item)
+                    } else {
+                        selected.wrappedValue.insert(item)
+                    }
+                } label: {
+                    Text(item)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 24)
+                        .padding(.horizontal, 8)
+                        .background(Color.black.opacity(isSelected ? 0.22 : 0.12), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func categoryGroupChip(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 6) {
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.bold))
+            }
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(.black)
+        .padding(.horizontal, 12)
+        .frame(height: 24)
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+
+    private func clearButton(action: @escaping () -> Void) -> some View {
+        Button("Clear all", action: action)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.black.opacity(0.35))
+            .padding(.horizontal, 14)
+            .frame(height: 24)
+            .background(Color.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .buttonStyle(.plain)
+    }
+
+    private func toggle(_ section: ClosetFilterSection) {
+        if expandedSections.contains(section) {
+            expandedSections.remove(section)
+        } else {
+            expandedSections.insert(section)
+        }
+    }
+
+    private func sectionSummary(for section: ClosetFilterSection) -> String {
+        switch section {
+        case .rating:
+            if let rating = filters.rating {
+                return "\(rating) stars"
+            }
+            return ""
+        case .categories:
+            let count = filters.categorySelectionCount
+            return count == 0 ? "" : "\(count) selected"
+        case .weather:
+            return summaryText(for: filters.weather)
+        case .occasion:
+            return summaryText(for: filters.occasion)
+        case .colors:
+            return summaryText(for: filters.colors)
+        case .custom:
+            return summaryText(for: filters.custom)
+        case .visibility:
+            return ""
+        }
+    }
+
+    private func summaryText(for set: Set<String>) -> String {
+        guard !set.isEmpty else { return "" }
+        if set.count == 1, let value = set.first {
+            return value
+        }
+        return "\(set.count) selected"
+    }
+
+    private func binding(for group: ClosetCategoryGroup) -> Binding<Set<String>> {
+        switch group {
+        case .tops:
+            return $filters.topCategories
+        case .bottoms:
+            return $filters.bottomCategories
+        case .outerwear:
+            return $filters.outerwearCategories
+        case .shoes:
+            return $filters.shoesCategories
+        case .accessories:
+            return $filters.accessoriesCategories
+        }
+    }
+}
+
+private struct OutfitEditView: View {
+    let photo: OutfitPhoto
+    let onClose: (OutfitMetadata) async -> Void
+    let onDelete: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var filters: ClosetFilters
+    @State private var notes = ""
+    @State private var visibility: OutfitVisibility = .privateProfile
+    @State private var expandedSections: Set<ClosetFilterSection> = []
+    @State private var isSaving = false
+    @State private var isDeleting = false
+
+    init(
+        photo: OutfitPhoto,
+        onClose: @escaping (OutfitMetadata) async -> Void,
+        onDelete: @escaping () async -> Void
+    ) {
+        self.photo = photo
+        self.onClose = onClose
+        self.onDelete = onDelete
+        _filters = State(initialValue: ClosetFilters(
+            metadata: OutfitMetadata(
+                customTags: photo.customTags,
+                categories: photo.categories,
+                weather: photo.weather,
+                occasion: photo.occasion,
+                colors: photo.colors
+            )
+        ))
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    editorHeader
+
+                    editSection(title: "Rating", placeholder: "Give a rating", section: .rating) {
+                        ratingRow
+                    }
+
+                    editSection(title: "Category", placeholder: "Choose a category", section: .categories) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            ForEach(ClosetCategoryGroup.allCases) { group in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    editorCategoryGroupChip(group.title, isSelected: true)
+                                    editorChipGrid(items: group.items, selected: binding(for: group))
+                                }
+                            }
+                        }
+                    }
+
+                    editSection(title: "Weather", placeholder: "Choose the weather", section: .weather) {
+                        editorChipGrid(items: ClosetFilters.weatherOptions, selected: $filters.weather)
+                    }
+
+                    editSection(title: "Occasion", placeholder: "Choose the occassion", section: .occasion) {
+                        editorChipGrid(items: ClosetFilters.occasionOptions, selected: $filters.occasion)
+                    }
+
+                    editSection(title: "Colors", placeholder: "Choose the colors", section: .colors) {
+                        editorChipGrid(items: ClosetFilters.colorOptions, selected: $filters.colors)
+                    }
+
+                    editSection(title: "Custom", placeholder: "Choose your custom tags", section: .custom) {
+                        editorChipGrid(items: filters.customSuggestions, selected: $filters.custom)
+                    }
+
+                    Divider()
+                        .overlay(Color.black.opacity(0.4))
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Additional Images")
+                            .font(.title3.weight(.semibold))
+
+                        Button {
+                        } label: {
+                            RoundedRectangle(cornerRadius: 0, style: .continuous)
+                                .stroke(style: StrokeStyle(lineWidth: 1, dash: [2.5]))
+                                .fill(Color.clear)
+                                .frame(width: 88, height: 88)
+                                .overlay {
+                                    VStack(spacing: 4) {
+                                        Image(systemName: "photo")
+                                            .font(.system(size: 20))
+                                        Text("Add")
+                                            .font(.caption)
+                                    }
+                                    .foregroundStyle(.black.opacity(0.55))
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Divider()
+                        .overlay(Color.black.opacity(0.4))
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Notes")
+                            .font(.title3.weight(.semibold))
+
+                        ZStack(alignment: .topLeading) {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.black.opacity(0.10))
+                                .frame(height: 138)
+
+                            TextEditor(text: $notes)
+                                .scrollContentBackground(.hidden)
+                                .background(Color.clear)
+                                .frame(height: 138)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+
+                            if notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text("Write here")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.black.opacity(0.55))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 14)
+                            }
+                        }
+                    }
+
+                    Divider()
+                        .overlay(Color.black.opacity(0.4))
+
+                    editSection(title: "Visibility", placeholder: "Choose your visibility", section: .visibility) {
+                        editorChipGrid(items: OutfitVisibility.allCases.map(\.title), selected: visibilityBinding)
+                    }
+
+                    Button(role: .destructive) {
+                        deleteOutfit()
+                    } label: {
+                        Text(isDeleting ? "Deleting..." : "Delete outfit")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.black)
+                            .frame(width: 210, height: 34)
+                            .background(Color.black.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
+                    .disabled(isDeleting || isSaving)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 2)
+                .padding(.bottom, 32)
+            }
+            .background(Color.white)
+        }
+    }
+
+    private var editorHeader: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.black.opacity(0.10))
+                .frame(height: 56)
+
+            Text("Edit Tags")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.black)
+
+            HStack {
+                Button {
+                    saveAndDismiss()
+                } label: {
+                    Image(systemName: "xmark.circle")
+                        .font(.title3)
+                        .foregroundStyle(.black)
+                }
+                .disabled(isSaving || isDeleting)
+
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+        }
+    }
+
+    @ViewBuilder
+    private func editSection<Content: View>(
+        title: String,
+        placeholder: String,
+        section: ClosetFilterSection,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                toggle(section)
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.black)
+
+                    Spacer()
+
+                    Text(editorSummary(for: section).isEmpty ? placeholder : editorSummary(for: section))
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(editorSummary(for: section).isEmpty ? Color.black.opacity(0.35) : .black)
+
+                    Image(systemName: expandedSections.contains(section) ? "chevron.up" : "chevron.down")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.black)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if expandedSections.contains(section) {
+                content()
+                    .padding(.leading, 10)
+            }
+        }
+    }
+
+    private var ratingRow: some View {
+        HStack(spacing: 8) {
+            ForEach(1...5, id: \.self) { value in
+                Button {
+                    filters.rating = filters.rating == value ? nil : value
+                } label: {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(value <= (filters.rating ?? 0) ? Color(red: 1.0, green: 0.84, blue: 0.24) : Color.black.opacity(0.18))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func editorChipGrid(items: [String], selected: Binding<Set<String>>) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 64, maximum: 132), spacing: 8)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(items, id: \.self) { item in
+                let isSelected = selected.wrappedValue.contains(item)
+
+                Button {
+                    if isSelected {
+                        selected.wrappedValue.remove(item)
+                    } else {
+                        selected.wrappedValue.insert(item)
+                    }
+                } label: {
+                    Text(item)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 24)
+                        .padding(.horizontal, 8)
+                        .background(Color.black.opacity(isSelected ? 0.22 : 0.12), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func editorCategoryGroupChip(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 6) {
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.bold))
+            }
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(.black)
+        .padding(.horizontal, 12)
+        .frame(height: 24)
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+
+    private var visibilityBinding: Binding<Set<String>> {
+        Binding(
+            get: { [visibility.title] },
+            set: { values in
+                if let value = values.first, let selected = OutfitVisibility(title: value) {
+                    visibility = selected
+                }
+            }
+        )
+    }
+
+    private func binding(for group: ClosetCategoryGroup) -> Binding<Set<String>> {
+        switch group {
+        case .tops:
+            return $filters.topCategories
+        case .bottoms:
+            return $filters.bottomCategories
+        case .outerwear:
+            return $filters.outerwearCategories
+        case .shoes:
+            return $filters.shoesCategories
+        case .accessories:
+            return $filters.accessoriesCategories
+        }
+    }
+
+    private func toggle(_ section: ClosetFilterSection) {
+        if expandedSections.contains(section) {
+            expandedSections.remove(section)
+        } else {
+            expandedSections.insert(section)
+        }
+    }
+
+    private func editorSummary(for section: ClosetFilterSection) -> String {
+        switch section {
+        case .rating:
+            if let rating = filters.rating {
+                return "\(rating) stars"
+            }
+            return ""
+        case .categories:
+            let count = filters.categorySelectionCount
+            return count == 0 ? "" : "\(count) selected"
+        case .weather:
+            return selectionSummary(for: filters.weather)
+        case .occasion:
+            return selectionSummary(for: filters.occasion)
+        case .colors:
+            return selectionSummary(for: filters.colors)
+        case .custom:
+            return selectionSummary(for: filters.custom)
+        case .visibility:
+            return visibility.title
+        }
+    }
+
+    private func selectionSummary(for values: Set<String>) -> String {
+        guard !values.isEmpty else { return "" }
+        if values.count == 1, let first = values.first {
+            return first
+        }
+        return "\(values.count) selected"
+    }
+
+    private func saveAndDismiss() {
+        guard !isSaving, !isDeleting else { return }
+
+        Task {
+            isSaving = true
+            await onClose(filters.metadata)
+            isSaving = false
+            dismiss()
+        }
+    }
+
+    private func deleteOutfit() {
+        guard !isDeleting, !isSaving else { return }
+
+        Task {
+            isDeleting = true
+            await onDelete()
+            isDeleting = false
+            dismiss()
+        }
+    }
+}
+
+private enum ClosetFilterSection: Hashable {
+    case rating
+    case categories
+    case weather
+    case occasion
+    case colors
+    case custom
+    case visibility
+}
+
+private enum ClosetCategoryGroup: String, CaseIterable, Identifiable {
+    case tops
+    case bottoms
+    case outerwear
+    case shoes
+    case accessories
+
+    var id: String { rawValue }
+
+    var title: String { rawValue }
+
+    var items: [String] {
+        switch self {
+        case .tops:
+            return ["t-shirt", "zip-up", "tank top", "crop top", "button-up", "hoodie", "long-sleeve", "sweater", "polo", "cardigan", "flannel", "blouse"]
+        case .bottoms:
+            return ["jeans", "shorts", "leggings", "trousers", "joggers", "skirt", "dress pants", "cargos", "sweatpants", "slacks", "jorts", "dress"]
+        case .outerwear:
+            return ["coat", "trench coat", "jacket", "fur coat", "cardigan", "blazer", "puffer jacket", "leather jacket", "windbreaker", "overcoat", "zip-up", "sweater"]
+        case .shoes:
+            return ["running shoes", "boots", "sandals", "dress shoes", "loafers", "high heels", "slides", "sneakers"]
+        case .accessories:
+            return ["hat", "scarf", "glasses", "watch", "handbag", "necklace", "earrings", "belt", "bracelet", "rings", "gloves", "sunglasses"]
+        }
+    }
+}
+
+private struct ClosetFilters {
+    var rating: Int?
+    var topCategories: Set<String> = []
+    var bottomCategories: Set<String> = []
+    var outerwearCategories: Set<String> = []
+    var shoesCategories: Set<String> = []
+    var accessoriesCategories: Set<String> = []
+    var weather: Set<String> = []
+    var occasion: Set<String> = []
+    var colors: Set<String> = []
+    var custom: Set<String> = []
+
+    static let weatherOptions = ["sunny", "cold", "rainy", "snowy", "humid", "warm", "hot", "windy"]
+    static let occasionOptions = ["casual", "formal", "biz-casual", "semi-formal", "going out", "outdoors", "date night", "concert", "at home", "professional", "beach", "special event"]
+    static let colorOptions = ["black", "white", "gray", "brown", "blue", "green", "red", "pink", "purple", "yellow", "orange", "tan"]
+
+    var customSuggestions: [String] {
+        ["vintage", "streetwear", "minimal", "layered", "gym", "cozy", "monochrome", "silver jewelry", "gold jewelry", "baggy"]
+    }
+
+    init() {}
+
+    init(tags: [String]) {
+        for tag in tags {
+            let normalized = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+            let lowercased = normalized.lowercased()
+
+            if Self.weatherOptions.contains(lowercased) {
+                weather.insert(lowercased)
+            } else if Self.occasionOptions.contains(lowercased) {
+                occasion.insert(lowercased)
+            } else if Self.colorOptions.contains(lowercased) {
+                colors.insert(lowercased)
+            } else if ClosetCategoryGroup.tops.items.contains(lowercased) {
+                topCategories.insert(lowercased)
+            } else if ClosetCategoryGroup.bottoms.items.contains(lowercased) {
+                bottomCategories.insert(lowercased)
+            } else if ClosetCategoryGroup.outerwear.items.contains(lowercased) {
+                outerwearCategories.insert(lowercased)
+            } else if ClosetCategoryGroup.shoes.items.contains(lowercased) {
+                shoesCategories.insert(lowercased)
+            } else if ClosetCategoryGroup.accessories.items.contains(lowercased) {
+                accessoriesCategories.insert(lowercased)
+            } else {
+                custom.insert(normalized)
+            }
+        }
+    }
+
+    init(metadata: OutfitMetadata) {
+        topCategories = Set(metadata.categories.filter { ClosetCategoryGroup.tops.items.contains($0.lowercased()) }.map { $0.lowercased() })
+        bottomCategories = Set(metadata.categories.filter { ClosetCategoryGroup.bottoms.items.contains($0.lowercased()) }.map { $0.lowercased() })
+        outerwearCategories = Set(metadata.categories.filter { ClosetCategoryGroup.outerwear.items.contains($0.lowercased()) }.map { $0.lowercased() })
+        shoesCategories = Set(metadata.categories.filter { ClosetCategoryGroup.shoes.items.contains($0.lowercased()) }.map { $0.lowercased() })
+        accessoriesCategories = Set(metadata.categories.filter { ClosetCategoryGroup.accessories.items.contains($0.lowercased()) }.map { $0.lowercased() })
+        weather = Set(metadata.weather.map { $0.lowercased() })
+        occasion = Set(metadata.occasion.map { $0.lowercased() })
+        colors = Set(metadata.colors.map { $0.lowercased() })
+        custom = Set(metadata.customTags)
+    }
+
+    var hasActiveSelections: Bool {
+        rating != nil ||
+        categorySelectionCount > 0 ||
+        !weather.isEmpty ||
+        !occasion.isEmpty ||
+        !colors.isEmpty ||
+        !custom.isEmpty
+    }
+
+    var categorySelectionCount: Int {
+        topCategories.count +
+        bottomCategories.count +
+        outerwearCategories.count +
+        shoesCategories.count +
+        accessoriesCategories.count
+    }
+
+    var weatherNormalized: Set<String> {
+        Set(weather.map { $0.lowercased() })
+    }
+
+    var occasionNormalized: Set<String> {
+        Set(occasion.map { $0.lowercased() })
+    }
+
+    var colorsNormalized: Set<String> {
+        Set(colors.map { $0.lowercased() })
+    }
+
+    var customNormalized: Set<String> {
+        Set(custom.map { $0.lowercased() })
+    }
+
+    var combinedTags: [String] {
+        var orderedTags: [String] = []
+
+        orderedTags.append(contentsOf: ClosetCategoryGroup.tops.items.filter { topCategories.contains($0) })
+        orderedTags.append(contentsOf: ClosetCategoryGroup.bottoms.items.filter { bottomCategories.contains($0) })
+        orderedTags.append(contentsOf: ClosetCategoryGroup.outerwear.items.filter { outerwearCategories.contains($0) })
+        orderedTags.append(contentsOf: ClosetCategoryGroup.shoes.items.filter { shoesCategories.contains($0) })
+        orderedTags.append(contentsOf: ClosetCategoryGroup.accessories.items.filter { accessoriesCategories.contains($0) })
+        orderedTags.append(contentsOf: Self.weatherOptions.filter { weather.contains($0) })
+        orderedTags.append(contentsOf: Self.occasionOptions.filter { occasion.contains($0) })
+        orderedTags.append(contentsOf: Self.colorOptions.filter { colors.contains($0) })
+        orderedTags.append(contentsOf: custom.sorted())
+
+        return Array(NSOrderedSet(array: orderedTags)) as? [String] ?? orderedTags
+    }
+
+    var metadata: OutfitMetadata {
+        OutfitMetadata(
+            customTags: custom.sorted(),
+            categories: selectedCategories,
+            weather: Self.weatherOptions.filter { weather.contains($0) },
+            occasion: Self.occasionOptions.filter { occasion.contains($0) },
+            colors: Self.colorOptions.filter { colors.contains($0) }
+        )
+    }
+
+    var selectedCategories: [String] {
+        var orderedCategories: [String] = []
+        orderedCategories.append(contentsOf: ClosetCategoryGroup.tops.items.filter { topCategories.contains($0) })
+        orderedCategories.append(contentsOf: ClosetCategoryGroup.bottoms.items.filter { bottomCategories.contains($0) })
+        orderedCategories.append(contentsOf: ClosetCategoryGroup.outerwear.items.filter { outerwearCategories.contains($0) })
+        orderedCategories.append(contentsOf: ClosetCategoryGroup.shoes.items.filter { shoesCategories.contains($0) })
+        orderedCategories.append(contentsOf: ClosetCategoryGroup.accessories.items.filter { accessoriesCategories.contains($0) })
+        return Array(NSOrderedSet(array: orderedCategories)) as? [String] ?? orderedCategories
+    }
+
+    func categoryMatches(tags: Set<String>) -> Bool {
+        let groups: [Set<String>] = [
+            Set(topCategories.map { $0.lowercased() }),
+            Set(bottomCategories.map { $0.lowercased() }),
+            Set(outerwearCategories.map { $0.lowercased() }),
+            Set(shoesCategories.map { $0.lowercased() }),
+            Set(accessoriesCategories.map { $0.lowercased() })
+        ]
+
+        return groups.allSatisfy { selection in
+            selection.isEmpty || !tags.isDisjoint(with: selection)
+        }
+    }
+
+    mutating func clearCategories() {
+        topCategories.removeAll()
+        bottomCategories.removeAll()
+        outerwearCategories.removeAll()
+        shoesCategories.removeAll()
+        accessoriesCategories.removeAll()
+    }
+}
+
+private enum OutfitVisibility: CaseIterable {
+    case privateProfile
+    case friends
+    case publicProfile
+
+    var title: String {
+        switch self {
+        case .privateProfile:
+            return "private"
+        case .friends:
+            return "friends"
+        case .publicProfile:
+            return "public"
+        }
+    }
+
+    init?(title: String) {
+        switch title {
+        case "private":
+            self = .privateProfile
+        case "friends":
+            self = .friends
+        case "public":
+            self = .publicProfile
+        default:
+            return nil
         }
     }
 }
@@ -426,10 +1816,11 @@ private struct OutfitUploadTaggingView: View {
     let image: UIImage
     let isSaving: Bool
     let onCancel: () -> Void
-    let onSave: ([String]) -> Void
+    let onSave: (OutfitMetadata) -> Void
 
+    @State private var filters = ClosetFilters()
+    @State private var expandedSections: Set<ClosetFilterSection> = []
     @State private var tagInput = ""
-    @State private var selectedTags: [String] = []
 
     private let suggestedTags = [
         "Black Top",
@@ -446,6 +1837,7 @@ private struct OutfitUploadTaggingView: View {
 
     private var filteredSuggestions: [String] {
         let normalizedInput = tagInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let selectedTags = Array(filters.custom)
 
         if normalizedInput.isEmpty {
             return suggestedTags.filter { !selectedTags.contains($0) }
@@ -458,15 +1850,16 @@ private struct OutfitUploadTaggingView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                promptRow
-                tagChips
-                Divider()
-                    .padding(.top, 18)
-                    .padding(.bottom, 16)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    promptRow
+                    tagChips
+                    metadataSections
+                    Divider()
+                        .padding(.top, 18)
+                        .padding(.bottom, 16)
 
-                ScrollView {
                     LazyVStack(alignment: .leading, spacing: 18) {
                         ForEach(filteredSuggestions, id: \.self) { tag in
                             Button(action: {
@@ -480,12 +1873,10 @@ private struct OutfitUploadTaggingView: View {
                         }
                     }
                 }
-
-                Spacer()
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 24)
             .background(Color.white)
         }
     }
@@ -537,6 +1928,7 @@ private struct OutfitUploadTaggingView: View {
 
     @ViewBuilder
     private var tagChips: some View {
+        let selectedTags = Array(filters.custom).sorted()
         if !selectedTags.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -545,7 +1937,7 @@ private struct OutfitUploadTaggingView: View {
                             Text(tag)
                                 .font(.subheadline.weight(.medium))
                             Button {
-                                selectedTags.removeAll { $0 == tag }
+                                filters.custom.remove(tag)
                             } label: {
                                 Image(systemName: "xmark")
                                     .font(.caption.weight(.bold))
@@ -563,32 +1955,188 @@ private struct OutfitUploadTaggingView: View {
         }
     }
 
+    private var metadataSections: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            uploadSection(title: "Category", placeholder: "Choose categories", section: .categories) {
+                VStack(alignment: .leading, spacing: 14) {
+                    ForEach(ClosetCategoryGroup.allCases) { group in
+                        VStack(alignment: .leading, spacing: 10) {
+                            categoryGroupChip(group.title, isSelected: true)
+                            chipGrid(items: group.items, selected: binding(for: group))
+                        }
+                    }
+                }
+            }
+
+            uploadSection(title: "Weather", placeholder: "Choose the weather", section: .weather) {
+                chipGrid(items: ClosetFilters.weatherOptions, selected: $filters.weather)
+            }
+
+            uploadSection(title: "Occasion", placeholder: "Choose the occasion", section: .occasion) {
+                chipGrid(items: ClosetFilters.occasionOptions, selected: $filters.occasion)
+            }
+
+            uploadSection(title: "Colors", placeholder: "Choose the colors", section: .colors) {
+                chipGrid(items: ClosetFilters.colorOptions, selected: $filters.colors)
+            }
+        }
+        .padding(.top, 20)
+    }
+
+    @ViewBuilder
+    private func uploadSection<Content: View>(
+        title: String,
+        placeholder: String,
+        section: ClosetFilterSection,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                toggle(section)
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.black)
+
+                    Spacer()
+
+                    Text(uploadSummary(for: section).isEmpty ? placeholder : uploadSummary(for: section))
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(uploadSummary(for: section).isEmpty ? Color.black.opacity(0.35) : .black)
+
+                    Image(systemName: expandedSections.contains(section) ? "chevron.up" : "chevron.down")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.black)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if expandedSections.contains(section) {
+                content()
+            }
+        }
+    }
+
+    private func chipGrid(items: [String], selected: Binding<Set<String>>) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 64, maximum: 132), spacing: 8)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(items, id: \.self) { item in
+                let isSelected = selected.wrappedValue.contains(item)
+
+                Button {
+                    if isSelected {
+                        selected.wrappedValue.remove(item)
+                    } else {
+                        selected.wrappedValue.insert(item)
+                    }
+                } label: {
+                    Text(item)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 24)
+                        .padding(.horizontal, 8)
+                        .background(Color.black.opacity(isSelected ? 0.22 : 0.12), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func categoryGroupChip(_ title: String, isSelected: Bool) -> some View {
+        HStack(spacing: 6) {
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.bold))
+            }
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundStyle(.black)
+        .padding(.horizontal, 12)
+        .frame(height: 24)
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+
+    private func binding(for group: ClosetCategoryGroup) -> Binding<Set<String>> {
+        switch group {
+        case .tops:
+            return $filters.topCategories
+        case .bottoms:
+            return $filters.bottomCategories
+        case .outerwear:
+            return $filters.outerwearCategories
+        case .shoes:
+            return $filters.shoesCategories
+        case .accessories:
+            return $filters.accessoriesCategories
+        }
+    }
+
+    private func toggle(_ section: ClosetFilterSection) {
+        if expandedSections.contains(section) {
+            expandedSections.remove(section)
+        } else {
+            expandedSections.insert(section)
+        }
+    }
+
+    private func uploadSummary(for section: ClosetFilterSection) -> String {
+        switch section {
+        case .categories:
+            let count = filters.categorySelectionCount
+            return count == 0 ? "" : "\(count) selected"
+        case .weather:
+            return summaryText(for: filters.weather)
+        case .occasion:
+            return summaryText(for: filters.occasion)
+        case .colors:
+            return summaryText(for: filters.colors)
+        case .custom:
+            return summaryText(for: filters.custom)
+        case .rating, .visibility:
+            return ""
+        }
+    }
+
+    private func summaryText(for set: Set<String>) -> String {
+        guard !set.isEmpty else { return "" }
+        if set.count == 1, let value = set.first {
+            return value
+        }
+        return "\(set.count) selected"
+    }
+
     private func addTag(_ rawTag: String) {
         let tag = rawTag.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !tag.isEmpty else { return }
-        guard !selectedTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) else {
+        guard !filters.custom.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) else {
             tagInput = ""
             return
         }
 
-        selectedTags.append(tag)
+        filters.custom.insert(tag)
         tagInput = ""
     }
 
     private func saveOutfit() {
         let trimmedInput = tagInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalTags: [String]
 
         if
             !trimmedInput.isEmpty,
-            !selectedTags.contains(where: { $0.caseInsensitiveCompare(trimmedInput) == .orderedSame })
+            !filters.custom.contains(where: { $0.caseInsensitiveCompare(trimmedInput) == .orderedSame })
         {
-            finalTags = selectedTags + [trimmedInput]
-        } else {
-            finalTags = selectedTags
+            filters.custom.insert(trimmedInput)
         }
 
-        onSave(finalTags)
+        onSave(filters.metadata)
     }
 }
 
