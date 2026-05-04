@@ -28,6 +28,32 @@ type WeatherSnapshot = {
   temperature_text: string
 }
 
+type ShortlistedOutfit = {
+  id: string
+  image_path: string
+  tags: string[]
+  categories: string[]
+  weather: string[]
+  occasion: string[]
+  colors: string[]
+}
+
+type ShortlistedInspiration = {
+  id: string
+  image_url: string
+  caption: string
+  categories: string[]
+  weather: string[]
+  occasion: string[]
+  colors: string[]
+  gender: string
+}
+
+type OutfitWithImage = ShortlistedOutfit & {
+  base64: string
+  mimeType: string
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -99,9 +125,19 @@ Deno.serve(async (req) => {
     }
 
     const weather = await fetchWeather(latitude, longitude, locality)
-
     const shortlist = buildShortlist(outfits, inspiration, weather.tags)
-    const aiResult = await buildSuggestionsWithGemini(shortlist, weather, geminiApiKey)
+    const outfitsWithImages = await fetchOutfitImages(supabase, shortlist.outfits)
+
+    if (outfitsWithImages.length < 1) {
+      return json({ error: 'Could not load outfit images.' }, 500)
+    }
+
+    const aiResult = await buildSuggestionsWithGemini(
+      outfitsWithImages,
+      shortlist.inspiration,
+      weather,
+      geminiApiKey,
+    )
 
     return json({
       left_outfit_id: aiResult.left_outfit_id,
@@ -133,7 +169,6 @@ function normalize(value: string) {
 
 function decodeCaptionTags(caption: string | null): string[] {
   if (!caption) return []
-
   try {
     const parsed = JSON.parse(caption)
     return Array.isArray(parsed) ? parsed.map((item) => String(item)) : []
@@ -159,6 +194,18 @@ function inspirationTokens(look: InspirationRow): string[] {
     ...(look.occasion ?? []),
     ...(look.colors ?? []),
   ].map(normalize)
+}
+
+function score(tokens: string[], weatherTags: Set<string>, userVocabulary: Set<string>) {
+  const tokenSet = new Set(tokens)
+  let total = 0
+  for (const tag of weatherTags) {
+    if (tokenSet.has(tag)) total += 4
+  }
+  for (const token of tokenSet) {
+    if (userVocabulary.has(token)) total += 1
+  }
+  return total + tokenSet.size
 }
 
 function buildShortlist(outfits: OutfitRow[], inspiration: InspirationRow[], weatherTags: string[]) {
@@ -206,19 +253,167 @@ function buildShortlist(outfits: OutfitRow[], inspiration: InspirationRow[], wea
   }
 }
 
-function score(tokens: string[], weatherTags: Set<string>, userVocabulary: Set<string>) {
-  const tokenSet = new Set(tokens)
-  let total = 0
+async function fetchOutfitImages(
+  supabase: ReturnType<typeof createClient>,
+  outfits: ShortlistedOutfit[],
+): Promise<OutfitWithImage[]> {
+  const results = await Promise.all(
+    outfits.map(async (outfit) => {
+      try {
+        const { data, error } = await supabase.storage
+          .from('outfit-photos')
+          .download(outfit.image_path)
 
-  for (const tag of weatherTags) {
-    if (tokenSet.has(tag)) total += 4
+        if (error || !data) return null
+
+        const arrayBuffer = await data.arrayBuffer()
+        const base64 = uint8ToBase64(new Uint8Array(arrayBuffer))
+        const mimeType = outfit.image_path.endsWith('.png') ? 'image/png' : 'image/jpeg'
+
+        return { ...outfit, base64, mimeType }
+      } catch {
+        return null
+      }
+    }),
+  )
+
+  return results.filter((r): r is OutfitWithImage => r !== null)
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 8192
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+async function buildSuggestionsWithGemini(
+  outfitsWithImages: OutfitWithImage[],
+  inspirationShortlist: ShortlistedInspiration[],
+  weather: WeatherSnapshot,
+  apiKey: string,
+) {
+  const parts: unknown[] = []
+
+  parts.push({
+    text: [
+      `You are a personal stylist AI for a fashion app.`,
+      `You will see ${outfitsWithImages.length} outfit photo(s) from the user's wardrobe, each labeled with an ID and any metadata tags the user added.`,
+      `Your tasks:`,
+      `1. Pick the 2 best outfits for today's weather. If only 1 outfit is available, use it for both left and right.`,
+      `2. Look carefully at each chosen photo and identify the specific clothing items you can see (e.g. "olive cargo pants", "white oversized tee", "chunky sneakers").`,
+      `3. Pick the most relevant inspiration look from the text list provided.`,
+      `4. Write a 2-3 sentence explanation that names specific items visible in the photos and explains why they work for today's conditions.`,
+      ``,
+      `Return a JSON object with exactly these fields:`,
+      `- left_outfit_id: string (ID of first chosen outfit)`,
+      `- right_outfit_id: string (ID of second chosen outfit, must differ from left if possible)`,
+      `- inspiration_id: string (ID from the inspiration list)`,
+      `- explanation: string (2-3 sentences referencing specific visible items)`,
+    ].join('\n'),
+  })
+
+  for (const outfit of outfitsWithImages) {
+    const allTags = [
+      ...outfit.tags,
+      ...outfit.categories,
+      ...outfit.weather,
+      ...outfit.occasion,
+      ...outfit.colors,
+    ].filter(Boolean)
+
+    parts.push({
+      text: `Outfit ID: ${outfit.id}\nUser tags: ${allTags.length > 0 ? allTags.join(', ') : 'none'}`,
+    })
+    parts.push({
+      inlineData: {
+        mimeType: outfit.mimeType,
+        data: outfit.base64,
+      },
+    })
   }
 
-  for (const token of tokenSet) {
-    if (userVocabulary.has(token)) total += 1
+  const weatherLine = [
+    `Current weather: ${weather.tags.join(', ')} ${weather.temperature_text}`,
+    weather.location_name ? `Location: ${weather.location_name}` : null,
+  ].filter(Boolean).join('\n')
+
+  const inspirationLines = inspirationShortlist.map((look) => {
+    const tags = [...look.categories, ...look.weather, ...look.occasion, ...look.colors].filter(Boolean)
+    return `ID: ${look.id} | ${tags.join(', ')}`
+  }).join('\n')
+
+  parts.push({
+    text: `${weatherLine}\n\nInspiration look options — pick one by ID:\n${inspirationLines}`,
+  })
+
+  const response = await fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 400,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              left_outfit_id: { type: 'string' },
+              right_outfit_id: { type: 'string' },
+              inspiration_id: { type: 'string' },
+              explanation: { type: 'string' },
+            },
+            required: ['left_outfit_id', 'right_outfit_id', 'inspiration_id', 'explanation'],
+          },
+        },
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const text = await response.text()
+    console.error('Gemini error response', text)
+    throw new Error(`Gemini request failed: ${text}`)
   }
 
-  return total + tokenSet.size
+  const responseJson = await response.json()
+  const content = responseJson.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!content) {
+    console.error('Gemini returned unexpected payload', responseJson)
+    throw new Error('Gemini returned no content.')
+  }
+
+  const parsed = JSON.parse(content) as {
+    left_outfit_id: string
+    right_outfit_id: string
+    inspiration_id: string
+    explanation: string
+  }
+
+  const leftOutfit = outfitsWithImages.find((o) => o.id === parsed.left_outfit_id)
+    ?? outfitsWithImages[0]
+
+  const rightOutfit = outfitsWithImages.find((o) => o.id === parsed.right_outfit_id && o.id !== leftOutfit.id)
+    ?? outfitsWithImages.find((o) => o.id !== leftOutfit.id)
+    ?? leftOutfit
+
+  const inspiration = inspirationShortlist.find((i) => i.id === parsed.inspiration_id)
+    ?? inspirationShortlist[0]
+
+  return {
+    left_outfit_id: leftOutfit.id,
+    right_outfit_id: rightOutfit.id,
+    inspiration,
+    explanation: parsed.explanation,
+  }
 }
 
 async function fetchWeather(latitude: number, longitude: number, locality: string | null): Promise<WeatherSnapshot> {
@@ -233,8 +428,8 @@ async function fetchWeather(latitude: number, longitude: number, locality: strin
     throw new Error('Weather lookup failed.')
   }
 
-  const json = await response.json()
-  const current = json.current
+  const data = await response.json()
+  const current = data.current
   const apparent = Number(current.apparent_temperature ?? current.temperature_2m ?? 70)
   const code = Number(current.weather_code ?? 0)
 
@@ -273,203 +468,25 @@ async function fetchWeather(latitude: number, longitude: number, locality: strin
   }
 }
 
-async function buildSuggestionsWithGemini(
-  shortlist: ReturnType<typeof buildShortlist>,
-  weather: WeatherSnapshot,
-  apiKey: string,
-) {
-  const leftOutfit = shortlist.outfits[0]
-  const rightOutfit = pickSecondOutfit(shortlist.outfits, leftOutfit)
-  const inspiration = shortlist.inspiration[0]
-
-  if (!leftOutfit) {
-    throw new Error('No shortlisted closet outfits were available.')
-  }
-
-  if (!inspiration) {
-    throw new Error('No shortlisted inspiration looks were available.')
-  }
-
-  const prompt = [
-    'You are writing a concise outfit suggestion explanation for a fashion app.',
-    'Use the provided weather and the selected closet pieces.',
-    'Mention concrete pieces from the left closet outfit and right closet outfit.',
-    'Explain why the center inspiration look fits today.',
-    'Return exactly 2 complete sentences in one paragraph.',
-    'Sentence 1: explain why the inspiration look fits the current weather.',
-    'Sentence 2: mention specific pieces from the left and right closet outfits that could be combined.',
-    'Do not return sentence fragments.',
-    '',
-    JSON.stringify({
-      weather,
-      left_outfit: leftOutfit,
-      right_outfit: rightOutfit,
-      inspiration,
-    }),
-  ].join('\n')
-
-  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 260,
-      },
-    }),
-  })
-
-  if (!response.ok) {
-    const text = await response.text()
-    console.error('Gemini error response', text)
-    throw new Error(`Gemini request failed: ${text}`)
-  }
-
-  const json = await response.json()
-  const content = json.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!content) {
-    console.error('Gemini returned unexpected payload', json)
-    throw new Error('Gemini returned no structured content.')
-  }
-
-  return {
-    left_outfit_id: leftOutfit.id,
-    right_outfit_id: rightOutfit.id,
-    inspiration,
-    explanation: buildExplanationText(content, weather, leftOutfit, rightOutfit, inspiration),
-  }
-}
-
-function sanitizeExplanation(content: string) {
-  return content
-    .replace(/^```[\w-]*\s*/i, '')
-    .replace(/\s*```$/, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function diversifyOutfits(
-  outfits: Array<{ id: string; image_path: string; tags: string[]; categories: string[]; weather: string[]; occasion: string[]; colors: string[] }>,
-) {
+function diversifyOutfits(outfits: ShortlistedOutfit[]) {
   if (outfits.length <= 2) return outfits
-
   const topBand = outfits.slice(0, Math.min(4, outfits.length))
   const remainder = outfits.slice(Math.min(4, outfits.length))
-  const shuffledTopBand = shuffle(topBand)
-  return [...shuffledTopBand, ...remainder]
+  return [...shuffle(topBand), ...remainder]
 }
 
-function diversifyInspiration(
-  inspiration: Array<{ id: string; image_url: string; caption: string; categories: string[]; weather: string[]; occasion: string[]; colors: string[]; gender: string }>,
-) {
+function diversifyInspiration(inspiration: ShortlistedInspiration[]) {
   if (inspiration.length <= 1) return inspiration
-
   const topBand = inspiration.slice(0, Math.min(5, inspiration.length))
   const remainder = inspiration.slice(Math.min(5, inspiration.length))
-  const shuffledTopBand = shuffle(topBand)
-  return [...shuffledTopBand, ...remainder]
+  return [...shuffle(topBand), ...remainder]
 }
 
-function shuffle<T>(items: T[]) {
+function shuffle<T>(items: T[]): T[] {
   const copy = [...items]
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1))
-    const current = copy[index]
-    copy[index] = copy[swapIndex]
-    copy[swapIndex] = current
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
   }
   return copy
-}
-
-function buildExplanationText(
-  rawContent: string,
-  weather: WeatherSnapshot,
-  leftOutfit: { tags: string[]; categories: string[]; colors: string[] },
-  rightOutfit: { tags: string[]; categories: string[]; colors: string[] },
-  inspiration: { categories: string[]; colors: string[] },
-) {
-  const sanitized = sanitizeExplanation(rawContent)
-  const wordCount = sanitized.split(/\s+/).filter(Boolean).length
-  const sentenceCount = sanitized.split(/[.!?]+/).map((part) => part.trim()).filter(Boolean).length
-
-  if (wordCount >= 18 && sentenceCount >= 2) {
-    return sanitized
-  }
-
-  const leftPieces = preferredItems(leftOutfit.tags, leftOutfit.categories)
-  const rightPieces = preferredItems(rightOutfit.tags, rightOutfit.categories)
-  const inspirationPieces = preferredItems(inspiration.categories, inspiration.colors)
-
-  return `${weather.summary} The inspiration look works because it lines up with today's conditions and leans on ${inspirationPieces}. You could pull ${leftPieces} from one closet outfit and ${rightPieces} from another to get close to that silhouette without starting from scratch.`
-}
-
-function preferredItems(primary: string[], secondary: string[]) {
-  const items = [...primary, ...secondary]
-    .map((value) => value.trim())
-    .filter(Boolean)
-
-  const unique: string[] = []
-  for (const item of items) {
-    if (!unique.some((existing) => normalize(existing) === normalize(item))) {
-      unique.push(item)
-    }
-  }
-
-  if (unique.length === 0) {
-    return 'core pieces'
-  }
-
-  return unique.slice(0, 2).join(' and ')
-}
-
-function pickSecondOutfit(
-  outfits: Array<{ id: string; tags: string[]; categories: string[]; weather: string[]; occasion: string[]; colors: string[] }>,
-  leftOutfit: { id: string; tags: string[]; categories: string[]; weather: string[]; occasion: string[]; colors: string[] },
-) {
-  const leftTokens = new Set([
-    ...leftOutfit.tags,
-    ...leftOutfit.categories,
-    ...leftOutfit.weather,
-    ...leftOutfit.occasion,
-    ...leftOutfit.colors,
-  ].map(normalize))
-
-  const candidates = outfits
-    .slice(1)
-    .map((outfit) => {
-      const tokens = new Set([
-        ...outfit.tags,
-        ...outfit.categories,
-        ...outfit.weather,
-        ...outfit.occasion,
-        ...outfit.colors,
-      ].map(normalize))
-
-      let overlap = 0
-      for (const token of tokens) {
-        if (leftTokens.has(token)) overlap += 1
-      }
-
-      return { outfit, overlap, tokenCount: tokens.size }
-    })
-    .sort((a, b) => {
-      if (a.overlap == b.overlap) {
-        return b.tokenCount - a.tokenCount
-      }
-      return a.overlap - b.overlap
-    })
-
-  return candidates[0]?.outfit ?? leftOutfit
 }

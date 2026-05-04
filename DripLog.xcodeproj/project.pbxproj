@@ -415,10 +415,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = H5265R259C;
+				DEVELOPMENT_TEAM = R95CA448PS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take outfit photos to save to your profile.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "DripLog uses your location to check the weather and suggest outfits for today.";
 				INFOPLIST_KEY_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvd2ZnZGxjcXRncHJhaXptb29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTc2MDUsImV4cCI6MjA5MjM3MzYwNX0.rW8Ug2NAMaMsTD_WTVzllpZ_Yc3kBohpsD0u6wYyWGc;
 				INFOPLIST_KEY_SUPABASE_URL = "https://yowfgdlcqtgpraizmoom.supabase.co";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -450,10 +451,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = H5265R259C;
+				DEVELOPMENT_TEAM = R95CA448PS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take outfit photos to save to your profile.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "DripLog uses your location to check the weather and suggest outfits for today.";
 				INFOPLIST_KEY_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvd2ZnZGxjcXRncHJhaXptb29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTc2MDUsImV4cCI6MjA5MjM3MzYwNX0.rW8Ug2NAMaMsTD_WTVzllpZ_Yc3kBohpsD0u6wYyWGc;
 				INFOPLIST_KEY_SUPABASE_URL = "https://yowfgdlcqtgpraizmoom.supabase.co";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

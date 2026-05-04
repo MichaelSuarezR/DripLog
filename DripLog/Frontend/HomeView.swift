@@ -20,7 +20,6 @@ struct HomeView: View {
     @State private var editingOutfit: OutfitPhoto?
     @State private var outfitPhotos: [OutfitPhoto] = []
     @State private var outfitErrorMessage: String?
-    @State private var isUploadingOutfit = false
     @State private var didLoadOutfits = false
     @State private var outfitService: OutfitServicing?
     @State private var suggestionService: SuggestionServicing?
@@ -42,12 +41,14 @@ struct HomeView: View {
         .fullScreenCover(item: $pendingOutfitDraft) { draft in
             OutfitUploadTaggingView(
                 image: draft.image,
-                isSaving: isUploadingOutfit,
                 onCancel: {
                     pendingOutfitDraft = nil
                 },
                 onSave: { metadata in
-                    uploadOutfit(draft.image, metadata: metadata)
+                    let photo = try await service().uploadOutfit(draft.image, metadata: metadata, for: user.id)
+                    outfitPhotos.insert(photo, at: 0)
+                    pendingOutfitDraft = nil
+                    selectedTab = .closet
                 }
             )
         }
@@ -88,7 +89,7 @@ struct HomeView: View {
             )
         case .add:
             CreateTab(
-                isUploading: isUploadingOutfit,
+                isUploading: false,
                 errorMessage: outfitErrorMessage,
                 onCapture: prepareOutfit
             )
@@ -111,24 +112,6 @@ struct HomeView: View {
     private func prepareOutfit(_ image: UIImage) {
         outfitErrorMessage = nil
         pendingOutfitDraft = PendingOutfitDraft(image: image)
-    }
-
-    private func uploadOutfit(_ image: UIImage, metadata: OutfitMetadata) {
-        Task {
-            isUploadingOutfit = true
-            outfitErrorMessage = nil
-            defer { isUploadingOutfit = false }
-
-            do {
-                let photo = try await service().uploadOutfit(image, metadata: metadata, for: user.id)
-                outfitPhotos.insert(photo, at: 0)
-                pendingOutfitDraft = nil
-                selectedTab = .closet
-            } catch {
-                outfitErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not save outfit photo."
-                selectedTab = .add
-            }
-        }
     }
 
     private func updateOutfitMetadata(_ metadata: OutfitMetadata, for outfitID: UUID) async {
@@ -1814,13 +1797,14 @@ private enum OutfitVisibility: CaseIterable {
 
 private struct OutfitUploadTaggingView: View {
     let image: UIImage
-    let isSaving: Bool
     let onCancel: () -> Void
-    let onSave: (OutfitMetadata) -> Void
+    let onSave: (OutfitMetadata) async throws -> Void
 
     @State private var filters = ClosetFilters()
     @State private var expandedSections: Set<ClosetFilterSection> = []
     @State private var tagInput = ""
+    @State private var isSaving = false
+    @State private var saveError: String?
 
     private let suggestedTags = [
         "Black Top",
@@ -1882,26 +1866,37 @@ private struct OutfitUploadTaggingView: View {
     }
 
     private var header: some View {
-        HStack {
-            Button("Cancel", action: onCancel)
-                .font(.title3)
-                .foregroundStyle(.black)
+        VStack(spacing: 8) {
+            HStack {
+                Button("Cancel", action: onCancel)
+                    .font(.title3)
+                    .foregroundStyle(.black)
+                    .disabled(isSaving)
+                    .opacity(isSaving ? 0.4 : 1)
 
-            Spacer()
+                Spacer()
 
-            Text("Outfit Upload")
+                Text("Outfit Upload")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.black)
+
+                Spacer()
+
+                Button(isSaving ? "Saving..." : "Save") {
+                    saveOutfit()
+                }
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.black)
-
-            Spacer()
-
-            Button("Save") {
-                saveOutfit()
+                .disabled(isSaving)
+                .opacity(isSaving ? 0.4 : 1)
             }
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(.black)
-            .disabled(isSaving)
-            .opacity(isSaving ? 0.6 : 1)
+
+            if let saveError {
+                Text(saveError)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+            }
         }
         .padding(.bottom, 22)
     }
@@ -2127,16 +2122,27 @@ private struct OutfitUploadTaggingView: View {
     }
 
     private func saveOutfit() {
-        let trimmedInput = tagInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !isSaving else { return }
 
-        if
-            !trimmedInput.isEmpty,
-            !filters.custom.contains(where: { $0.caseInsensitiveCompare(trimmedInput) == .orderedSame })
-        {
+        let trimmedInput = tagInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedInput.isEmpty,
+           !filters.custom.contains(where: { $0.caseInsensitiveCompare(trimmedInput) == .orderedSame }) {
             filters.custom.insert(trimmedInput)
         }
 
-        onSave(filters.metadata)
+        let metadata = filters.metadata
+
+        Task {
+            isSaving = true
+            saveError = nil
+            defer { isSaving = false }
+
+            do {
+                try await onSave(metadata)
+            } catch {
+                saveError = (error as? LocalizedError)?.errorDescription ?? "Could not save outfit photo."
+            }
+        }
     }
 }
 
