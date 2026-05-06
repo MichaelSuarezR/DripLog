@@ -1,0 +1,8 @@
+// Copy this file to Config/Local.xcconfig and fill in your own values.
+// Local.xcconfig is gitignored so each developer has their own.
+
+// Your Apple Developer Team ID (find it at developer.apple.com under Membership)
+DEVELOPMENT_TEAM = YOUR_TEAM_ID_HERE
+
+// Your unique bundle ID prefix (e.g. com.yourname.DripLog)
+APP_BUNDLE_ID = com.yourname.DripLog
