@@ -17,7 +17,7 @@ import Vision
 struct OutfitPhoto: Identifiable {
     let id: UUID
     let imagePath: String
-    let image: UIImage
+    let imageURL: URL
     let tags: [String]
     let customTags: [String]
     let categories: [String]
@@ -135,19 +135,16 @@ struct SupabaseOutfitService: OutfitServicing {
             .order("created_at", ascending: false)
             .execute()
 
-        var photos: [OutfitPhoto] = []
-
-        for row in response.value {
-            let data = try await client.storage
-                .from(bucketName)
-                .download(path: row.imagePath)
-
-            if let image = UIImage(data: data) {
-                photos.append(
-                    OutfitPhoto(
+        let photos: [OutfitPhoto] = try await withThrowingTaskGroup(of: OutfitPhoto?.self) { group in
+            for row in response.value {
+                group.addTask {
+                    let signedURL = try await self.client.storage
+                        .from(self.bucketName)
+                        .createSignedURL(path: row.imagePath, expiresIn: 3600)
+                    return OutfitPhoto(
                         id: row.id,
                         imagePath: row.imagePath,
-                        image: image,
+                        imageURL: signedURL,
                         tags: row.metadata.allTags,
                         customTags: row.metadata.customTags,
                         categories: row.metadata.categories,
@@ -155,7 +152,19 @@ struct SupabaseOutfitService: OutfitServicing {
                         occasion: row.metadata.occasion,
                         colors: row.metadata.colors
                     )
-                )
+                }
+            }
+
+            var results: [OutfitPhoto] = []
+            for try await photo in group {
+                if let photo { results.append(photo) }
+            }
+            return results.sorted { a, b in
+                guard
+                    let ai = response.value.firstIndex(where: { $0.id == a.id }),
+                    let bi = response.value.firstIndex(where: { $0.id == b.id })
+                else { return false }
+                return ai < bi
             }
         }
 
@@ -190,10 +199,14 @@ struct SupabaseOutfitService: OutfitServicing {
             .insert(insert)
             .execute()
 
+        let signedURL = try await client.storage
+            .from(bucketName)
+            .createSignedURL(path: uploadPayload.path, expiresIn: 3600)
+
         return OutfitPhoto(
             id: outfitID,
             imagePath: uploadPayload.path,
-            image: uploadPayload.previewImage,
+            imageURL: signedURL,
             tags: normalizedMetadata.allTags,
             customTags: normalizedMetadata.customTags,
             categories: normalizedMetadata.categories,

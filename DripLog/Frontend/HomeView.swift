@@ -123,7 +123,7 @@ struct HomeView: View {
                 outfitPhotos[index] = OutfitPhoto(
                     id: existing.id,
                     imagePath: existing.imagePath,
-                    image: existing.image,
+                    imageURL: existing.imageURL,
                     tags: metadata.allTags,
                     customTags: metadata.customTags,
                     categories: metadata.categories,
@@ -619,14 +619,21 @@ private struct ProfileTab: View {
                 ForEach(filteredOutfits) { photo in
                     VStack(alignment: .leading, spacing: 6) {
                         ZStack(alignment: .topTrailing) {
-                            Image(uiImage: photo.image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(height: 172)
-                                .frame(maxWidth: .infinity)
-                                .background(Color.black.opacity(0.08))
-                                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                                .clipped()
+                            AsyncImage(url: photo.imageURL) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                default:
+                                    Color.black.opacity(0.08)
+                                }
+                            }
+                            .frame(height: 172)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.black.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                            .clipped()
 
                             Button {
                                 onEditOutfit(photo)
@@ -756,7 +763,7 @@ private struct SuggestionsView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 18) {
                                     closetSuggestionCard(
-                                        image: suggestions.leftOutfit.image,
+                                        imageURL: suggestions.leftOutfit.imageURL,
                                         title: "Your Closet",
                                         detail: cardDetail(for: suggestions.leftOutfit.tags)
                                     )
@@ -764,7 +771,7 @@ private struct SuggestionsView: View {
                                     inspirationSuggestionCard(look: suggestions.centerInspiration)
 
                                     closetSuggestionCard(
-                                        image: suggestions.rightOutfit.image,
+                                        imageURL: suggestions.rightOutfit.imageURL,
                                         title: "Your Closet",
                                         detail: cardDetail(for: suggestions.rightOutfit.tags)
                                     )
@@ -824,14 +831,21 @@ private struct SuggestionsView: View {
         }
     }
 
-    private func closetSuggestionCard(image: UIImage, title: String, detail: String) -> some View {
+    private func closetSuggestionCard(imageURL: URL, title: String, detail: String) -> some View {
         VStack(spacing: 12) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 286, height: 376)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .clipped()
+            AsyncImage(url: imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    Color.black.opacity(0.08)
+                }
+            }
+            .frame(width: 286, height: 376)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .clipped()
 
             VStack(spacing: 6) {
                 Text(title)
