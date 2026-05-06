@@ -10,272 +10,564 @@ import UIKit
 
 struct AuthView: View {
     @ObservedObject var viewModel: AuthViewModel
-    @State private var stage: Stage = .welcome
-    @FocusState private var focusedField: Field?
+    @State private var stage: Stage = .loading
 
-    private enum Field {
-        case name
-        case email
-        case password
-        case confirmPassword
-    }
-    
+    @State private var firstName = ""
+    @State private var lastName = ""
+
+    @FocusState private var focusedSignUpField: SignUpField?
+    @FocusState private var focusedSignInField: SignInField?
+
     private enum Stage {
-        case welcome
+        case loading
+        case createAccount
         case signUp
         case signIn
     }
 
-    var body: some View {
-        ZStack(alignment: .top) {
-            Color(red: 0.92, green: 0.92, blue: 0.92)
-                .ignoresSafeArea()
+    private enum SignUpField: Hashable {
+        case firstName, lastName, email, password, confirm
+    }
 
+    private enum SignInField: Hashable {
+        case email, password
+    }
+
+    var body: some View {
+        Group {
             switch stage {
-            case .welcome:
-                welcomeView
+            case .loading:
+                loadingView
+            case .createAccount:
+                createAccountView
             case .signUp:
-                authFormView(
-                    title: "Sign Up",
-                    subtitlePrefix: "Already have an account? ",
-                    subtitleAction: "Sign in",
-                    primaryTitle: "Register",
-                    socialText: "or sign up with",
-                    switchAction: {
-                        viewModel.mode = .logIn
-                        stage = .signIn
-                    }
-                )
+                signUpView
             case .signIn:
-                authFormView(
-                    title: "Welcome Back",
-                    subtitlePrefix: "Don’t have an account? ",
-                    subtitleAction: "Sign Up",
-                    primaryTitle: "Sign in",
-                    socialText: "or sign in with",
-                    switchAction: {
-                        viewModel.mode = .signUp
-                        stage = .signUp
-                    }
-                )
+                signInView
+            }
+        }
+        .onAppear {
+            guard stage == .loading else { return }
+            Task {
+                try? await Task.sleep(for: .milliseconds(1200))
+                if stage == .loading {
+                    stage = .createAccount
+                }
             }
         }
     }
-    
-    private var welcomeView: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            
-            RoundedRectangle(cornerRadius: 0, style: .continuous)
-                .fill(Color.black.opacity(0.12))
-                .frame(width: 333, height: 191)
-                .overlay {
-                    Text("LOGO")
-                        .font(.system(size: 40, weight: .bold))
+
+    // MARK: - Loading (Figma: 719:143)
+
+    private var loadingView: some View {
+        ZStack {
+            FittyColor.loadingBackground
+                .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                Text("Fitty")
+                    .font(FittyFont.logo(size: 50))
+                    .foregroundStyle(FittyColor.cream)
+
+                Image("FittyLoadingIllustration")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 281, height: 281)
+            }
+            .offset(y: -24)
+        }
+    }
+
+    // MARK: - Create account (Figma: 560:551)
+
+    private var createAccountView: some View {
+        ZStack(alignment: .bottom) {
+            FittyColor.cream
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Text("Fitty")
+                    .font(FittyFont.logo(size: 50))
+                    .foregroundStyle(.black)
+                    .padding(.top, 56)
+
+                Image("FittyCreateAccountIllustration")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 349, height: 349)
+                    .padding(.top, 8)
+
+                Spacer(minLength: 0)
+            }
+
+            VStack(spacing: 10) {
+                Text("Create Account")
+                    .font(FittyFont.uiBold(size: 24))
+                    .foregroundStyle(.black)
+
+                Text("Ready to get fitty?")
+                    .font(FittyFont.uiLight(size: 16))
+                    .foregroundStyle(.black)
+                    .padding(.bottom, 8)
+
+                Button("Get Started") {
+                    viewModel.mode = .signUp
+                    viewModel.errorMessage = nil
+                    stage = .signUp
                 }
-            
-            Spacer()
-            
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.black.opacity(0.12))
-                .frame(maxWidth: .infinity)
-                .frame(height: 340)
-                .overlay {
-                    VStack(spacing: 18) {
-                        Text("Create Account")
-                            .font(.system(size: 40, weight: .bold))
-                        
-                        Text("Track your closet, friends, and AI fits")
-                            .font(.system(size: 18))
-                            .multilineTextAlignment(.center)
-                            .padding(.bottom, 22)
-                        
-                        onboardingButton(title: "Get Started", action: {
-                            viewModel.mode = .signUp
-                            stage = .signUp
-                        })
-                        
-                        onboardingButton(title: "Sign in", action: {
-                            viewModel.mode = .logIn
-                            stage = .signIn
-                        })
-                    }
-                    .padding(.horizontal, 58)
-                    .padding(.vertical, 34)
+                .buttonStyle(FittyPrimaryCTAButtonStyle(height: 44, cornerRadius: 10))
+
+                Button("Sign in") {
+                    viewModel.mode = .logIn
+                    viewModel.errorMessage = nil
+                    stage = .signIn
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .buttonStyle(FittyPrimaryCTAButtonStyle(height: 44, cornerRadius: 10))
+
+                Spacer(minLength: 32)
+            }
+            .padding(.horizontal, 62)
+            .padding(.top, 36)
+            .frame(maxWidth: .infinity)
+            .frame(height: 454)
+            .background(FittyColor.cardWhite, in: UnevenRoundedRectangle(topLeadingRadius: 30, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 30, style: .continuous))
         }
         .ignoresSafeArea(edges: .bottom)
     }
-    
-    private func onboardingButton(title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 28, weight: .medium))
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .foregroundStyle(.black)
-                .background(Color.white.opacity(0.65), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-    
-    private func authFormView(
-        title: String,
-        subtitlePrefix: String,
-        subtitleAction: String,
-        primaryTitle: String,
-        socialText: String,
-        switchAction: @escaping () -> Void
-    ) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(title)
-                    .font(.system(size: 52, weight: .bold))
-                    .padding(.top, 110)
-                
-                HStack(spacing: 2) {
-                    Text(subtitlePrefix)
-                    Button(subtitleAction, action: switchAction)
-                        .foregroundStyle(Color(red: 0.24, green: 0.62, blue: 0.85))
-                }
-                .font(.system(size: 18))
-                
-                VStack(spacing: 14) {
-                    if viewModel.mode == .signUp {
-                        AuthTextField(title: "First Name", text: $viewModel.name)
-                            .focused($focusedField, equals: .name)
-                            .submitLabel(.next)
-                    }
-                    
-                    AuthTextField(
-                        title: "Email Address",
-                        text: $viewModel.email,
-                        keyboardType: .emailAddress,
-                        textContentType: .emailAddress
-                    )
-                    .focused($focusedField, equals: .email)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .submitLabel(.next)
-                    
-                    AuthSecureField(
-                        title: "Password",
-                        text: $viewModel.password,
-                        textContentType: viewModel.mode == .signUp ? .newPassword : .password
-                    )
-                    .focused($focusedField, equals: .password)
-                    .submitLabel(viewModel.mode == .signUp ? .next : .go)
-                    
-                    if viewModel.mode == .signUp {
-                        AuthSecureField(
-                            title: "Re-enter Password",
-                            text: $viewModel.confirmPassword,
-                            textContentType: .newPassword
-                        )
-                        .focused($focusedField, equals: .confirmPassword)
-                        .submitLabel(.go)
-                    }
-                }
-                .onSubmit(moveToNextField)
-                .padding(.top, 30)
-                
-                Button(action: viewModel.submit) {
-                    Text(viewModel.isWorking ? "Please wait..." : primaryTitle)
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(.black.opacity(0.9))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 62)
-                        .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(viewModel.isWorking)
-                .opacity(viewModel.isWorking ? 0.7 : 1)
-                .padding(.top, 18)
-                
-                if stage == .signIn {
-                    Button("Forgot your password?") {}
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color(red: 0.24, green: 0.62, blue: 0.85))
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 8)
-                }
-                
-                if let errorMessage = viewModel.errorMessage {
-                    Text(errorMessage)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.red)
-                }
-                
-                HStack(spacing: 10) {
-                    Rectangle()
-                        .fill(.black.opacity(0.4))
-                        .frame(height: 1)
-                    Text(socialText)
-                        .font(.system(size: 34, weight: .regular))
-                        .fixedSize()
-                    Rectangle()
-                        .fill(.black.opacity(0.4))
-                        .frame(height: 1)
-                }
-                .padding(.top, 58)
-                
-                Button("Google") {}
-                    .font(.system(size: 36))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 62)
-                    .foregroundStyle(.black)
-                    .background(Color.black.opacity(0.16), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
-                    .padding(.top, 34)
-                
-                Spacer(minLength: 24)
+
+    // MARK: - Sign up (Figma: 657:394)
+
+    private var signUpView: some View {
+        ZStack(alignment: .topLeading) {
+            FittyColor.cream
+                .ignoresSafeArea()
+
+            Button {
+                viewModel.errorMessage = nil
+                stage = .createAccount
+            } label: {
+                Image("FittySignUpBack")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
             }
-            .padding(.horizontal, 30)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Sign Up")
+                        .font(FittyFont.uiBold(size: 32))
+                        .padding(.top, 88)
+
+                    HStack(spacing: 0) {
+                        Text("Already have an account? ")
+                            .font(FittyFont.uiRegular(size: 12))
+                            .foregroundStyle(Color(hex: 0x1B1919))
+                        Button("Sign in") {
+                            viewModel.mode = .logIn
+                            viewModel.errorMessage = nil
+                            stage = .signIn
+                        }
+                        .font(FittyFont.uiBold(size: 12))
+                        .foregroundStyle(FittyColor.linkBlue)
+                        .underline()
+                        .buttonStyle(.plain)
+                    }
+
+                    VStack(spacing: 14) {
+                        fittyTextField(title: "First Name", text: $firstName, focused: $focusedSignUpField, equals: .firstName, submit: .lastName)
+                        fittyTextField(title: "Last Name", text: $lastName, focused: $focusedSignUpField, equals: .lastName, submit: .email)
+                        fittyTextField(title: "Email Address", text: $viewModel.email, keyboard: .emailAddress, contentType: .emailAddress, focused: $focusedSignUpField, equals: .email, submit: .password)
+                        fittySecureField(title: "Password", text: $viewModel.password, contentType: .newPassword, focused: $focusedSignUpField, equals: .password, submit: .confirm)
+                        fittySecureField(title: "Re-enter Password", text: $viewModel.confirmPassword, contentType: .newPassword, focused: $focusedSignUpField, equals: .confirm, submit: nil)
+                    }
+                    .padding(.top, 20)
+
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .font(FittyFont.uiRegular(size: 14))
+                            .foregroundStyle(.red)
+                    }
+
+                    Button {
+                        register()
+                    } label: {
+                        Text(viewModel.isWorking ? "Please wait…" : "Register")
+                    }
+                    .buttonStyle(FittyRegisterButtonStyle())
+                    .disabled(viewModel.isWorking)
+                    .padding(.top, 8)
+
+                    HStack(spacing: 8) {
+                        Rectangle()
+                            .fill(.black.opacity(0.35))
+                            .frame(height: 1)
+                        Text("or sign up with")
+                            .font(FittyFont.uiRegular(size: 16))
+                            .foregroundStyle(.black)
+                            .fixedSize()
+                        Rectangle()
+                            .fill(.black.opacity(0.35))
+                            .frame(height: 1)
+                    }
+                    .padding(.top, 28)
+
+                    Button("Google") {
+                        // OAuth not wired; email/password auth is functional via Supabase.
+                    }
+                    .buttonStyle(FittyGoogleButtonStyle())
+                    .padding(.top, 12)
+
+                    Spacer(minLength: 40)
+                }
+                .padding(.horizontal, 30)
+            }
         }
     }
 
-    private func moveToNextField() {
-        switch focusedField {
-        case .name:
-            focusedField = .email
-        case .email:
-            focusedField = .password
-        case .password where viewModel.mode == .signUp:
-            focusedField = .confirmPassword
-        default:
-            focusedField = nil
-            viewModel.submit()
+    // MARK: - Sign in (Figma: welcomeback 560:559)
+
+    private var signInView: some View {
+        ZStack(alignment: .topLeading) {
+            FittyColor.cream
+                .ignoresSafeArea()
+
+            Button {
+                viewModel.errorMessage = nil
+                stage = .createAccount
+            } label: {
+                Image("FittySignUpBack")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Welcome Back")
+                        .font(FittyFont.uiBold(size: 32))
+                        .padding(.top, 88)
+
+                    HStack(spacing: 0) {
+                        Text("Don’t have an account? ")
+                            .font(FittyFont.uiRegular(size: 12))
+                            .foregroundStyle(Color(hex: 0x1B1919))
+                        Button("Sign Up") {
+                            viewModel.mode = .signUp
+                            viewModel.errorMessage = nil
+                            stage = .signUp
+                        }
+                        .font(FittyFont.uiBold(size: 12))
+                        .foregroundStyle(FittyColor.linkBlue)
+                        .underline()
+                        .buttonStyle(.plain)
+                    }
+
+                    VStack(spacing: 14) {
+                        fittyTextField(title: "Email Address", text: $viewModel.email, keyboard: .emailAddress, contentType: .emailAddress, focused: $focusedSignInField, equals: .email, submit: .password)
+                        fittySecureField(title: "Password", text: $viewModel.password, contentType: .password, focused: $focusedSignInField, equals: .password, submit: nil)
+                    }
+                    .padding(.top, 24)
+
+                    Button("Forgot your password?") {}
+                        .font(FittyFont.uiBold(size: 12))
+                        .foregroundStyle(FittyColor.linkBlue)
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 4)
+
+                    if let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .font(FittyFont.uiRegular(size: 14))
+                            .foregroundStyle(.red)
+                    }
+
+                    Button {
+                        viewModel.mode = .logIn
+                        viewModel.submit()
+                    } label: {
+                        Text(viewModel.isWorking ? "Please wait…" : "Sign in")
+                    }
+                    .buttonStyle(FittyRegisterButtonStyle())
+                    .disabled(viewModel.isWorking)
+                    .padding(.top, 8)
+
+                    HStack(spacing: 8) {
+                        Rectangle()
+                            .fill(.black.opacity(0.35))
+                            .frame(height: 1)
+                        Text("or sign in with")
+                            .font(FittyFont.uiRegular(size: 16))
+                            .foregroundStyle(.black)
+                            .fixedSize()
+                        Rectangle()
+                            .fill(.black.opacity(0.35))
+                            .frame(height: 1)
+                    }
+                    .padding(.top, 28)
+
+                    Button("Google") {}
+                        .buttonStyle(FittyGoogleButtonStyle())
+                        .padding(.top, 12)
+
+                    Spacer(minLength: 40)
+                }
+                .padding(.horizontal, 30)
+            }
         }
     }
-}
 
-private struct AuthTextField: View {
-    let title: String
-    @Binding var text: String
-    var keyboardType: UIKeyboardType = .default
-    var textContentType: UITextContentType? = nil
+    // MARK: - Actions
 
-    var body: some View {
-        TextField(title, text: $text)
-            .keyboardType(keyboardType)
-            .textContentType(textContentType)
-            .padding(.horizontal, 22)
-            .frame(height: 62)
-            .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+    private func register() {
+        viewModel.mode = .signUp
+        let parts = [firstName, lastName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        viewModel.name = parts.joined(separator: " ")
+        viewModel.submit()
+    }
+
+    // MARK: - Fields
+
+    private func fittyTextField(
+        title: String,
+        text: Binding<String>,
+        keyboard: UIKeyboardType = .default,
+        contentType: UITextContentType? = nil,
+        focused: FocusState<SignUpField?>.Binding,
+        equals: SignUpField,
+        submit: SignUpField?
+    ) -> some View {
+        ZStack(alignment: .leading) {
+            if text.wrappedValue.isEmpty {
+                Text(title)
+                    .font(FittyFont.uiLight(size: 14))
+                    .foregroundStyle(.black.opacity(0.75))
+                    .padding(.leading, 22)
+            }
+            TextField("", text: text)
+                .font(FittyFont.uiRegular(size: 16))
+                .textContentType(contentType)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(keyboard == .emailAddress ? .never : .words)
+                .autocorrectionDisabled(keyboard == .emailAddress)
+                .padding(.horizontal, 22)
+                .focused(focused, equals: equals)
+                .submitLabel(submit == nil ? .done : .next)
+                .onSubmit {
+                    if let submit {
+                        focused.wrappedValue = submit
+                    }
+                }
+        }
+        .frame(height: 44)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
+    }
+
+    private func fittySecureField(
+        title: String,
+        text: Binding<String>,
+        contentType: UITextContentType?,
+        focused: FocusState<SignUpField?>.Binding,
+        equals: SignUpField,
+        submit: SignUpField?
+    ) -> some View {
+        ZStack(alignment: .leading) {
+            if text.wrappedValue.isEmpty {
+                Text(title)
+                    .font(FittyFont.uiLight(size: 14))
+                    .foregroundStyle(.black.opacity(0.75))
+                    .padding(.leading, 22)
+            }
+            SecureField("", text: text)
+                .font(FittyFont.uiRegular(size: 16))
+                .textContentType(contentType)
+                .padding(.horizontal, 22)
+                .focused(focused, equals: equals)
+                .submitLabel(submit == nil ? .done : .next)
+                .onSubmit {
+                    if let submit {
+                        focused.wrappedValue = submit
+                    }
+                }
+        }
+        .frame(height: 44)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
+    }
+
+    private func fittyTextField(
+        title: String,
+        text: Binding<String>,
+        keyboard: UIKeyboardType = .default,
+        contentType: UITextContentType? = nil,
+        focused: FocusState<SignInField?>.Binding,
+        equals: SignInField,
+        submit: SignInField?
+    ) -> some View {
+        ZStack(alignment: .leading) {
+            if text.wrappedValue.isEmpty {
+                Text(title)
+                    .font(FittyFont.uiLight(size: 14))
+                    .foregroundStyle(.black.opacity(0.75))
+                    .padding(.leading, 22)
+            }
+            TextField("", text: text)
+                .font(FittyFont.uiRegular(size: 16))
+                .textContentType(contentType)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .padding(.horizontal, 22)
+                .focused(focused, equals: equals)
+                .submitLabel(submit == nil ? .done : .next)
+                .onSubmit {
+                    if let submit {
+                        focused.wrappedValue = submit
+                    }
+                }
+        }
+        .frame(height: 44)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
+    }
+
+    private func fittySecureField(
+        title: String,
+        text: Binding<String>,
+        contentType: UITextContentType?,
+        focused: FocusState<SignInField?>.Binding,
+        equals: SignInField,
+        submit: SignInField?
+    ) -> some View {
+        ZStack(alignment: .leading) {
+            if text.wrappedValue.isEmpty {
+                Text(title)
+                    .font(FittyFont.uiLight(size: 14))
+                    .foregroundStyle(.black.opacity(0.75))
+                    .padding(.leading, 22)
+            }
+            SecureField("", text: text)
+                .font(FittyFont.uiRegular(size: 16))
+                .textContentType(contentType)
+                .padding(.horizontal, 22)
+                .focused(focused, equals: equals)
+                .submitLabel(submit == nil ? .done : .next)
+                .onSubmit {
+                    if let submit {
+                        focused.wrappedValue = submit
+                    }
+                }
+        }
+        .frame(height: 44)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
     }
 }
 
-private struct AuthSecureField: View {
-    let title: String
-    @Binding var text: String
-    var textContentType: UITextContentType? = nil
+// MARK: - Design tokens (Figma driplog-5-5)
 
-    var body: some View {
-        SecureField(title, text: $text)
-            .textContentType(textContentType)
-            .padding(.horizontal, 22)
-            .frame(height: 62)
-            .background(Color.black.opacity(0.15), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+private enum FittyColor {
+    static let loadingBackground = Color(hex: 0x4597B7)
+    static let cream = Color(hex: 0xF2EEE9)
+    static let cardWhite = Color(hex: 0xFBFBFA)
+    static let accentOrange = Color(hex: 0xD94A2F)
+    static let linkBlue = Color(hex: 0x4597B7)
+}
+
+/// Uses **GoodKitty** / **Coolvetica** when bundled in the app; otherwise closest system fonts.
+/// Add `GoodKitty-Regular.ttf` and Coolvetica variants to the target and list them under `UIAppFonts` in Info.plist for a pixel match.
+private enum FittyFont {
+    static func logo(size: CGFloat) -> Font {
+        if let name = firstAvailableFont(baseNames: ["GoodKitty-Regular", "GoodKitty"], size: size) {
+            return .custom(name, size: size)
+        }
+        return .system(size: size, weight: .light, design: .rounded)
+    }
+
+    static func uiBold(size: CGFloat) -> Font {
+        if let name = firstAvailableFont(baseNames: ["CoolveticaRg-Bold", "Coolvetica-Bold", "Coolvetica Bold"], size: size) {
+            return .custom(name, size: size)
+        }
+        return .system(size: size, weight: .bold, design: .default)
+    }
+
+    static func uiRegular(size: CGFloat) -> Font {
+        if let name = firstAvailableFont(baseNames: ["CoolveticaRg-Regular", "Coolvetica-Regular", "Coolvetica"], size: size) {
+            return .custom(name, size: size)
+        }
+        return .system(size: size, weight: .regular, design: .default)
+    }
+
+    static func uiLight(size: CGFloat) -> Font {
+        if let name = firstAvailableFont(baseNames: ["CoolveticaRg-Light", "Coolvetica-Light"], size: size) {
+            return .custom(name, size: size)
+        }
+        return .system(size: size, weight: .light, design: .default)
+    }
+
+    private static func firstAvailableFont(baseNames: [String], size: CGFloat) -> String? {
+        for base in baseNames where UIFont(name: base, size: size) != nil {
+            return base
+        }
+        return nil
+    }
+}
+
+private extension Color {
+    init(hex: UInt32, alpha: Double = 1) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: alpha
+        )
+    }
+}
+
+private struct FittyPrimaryCTAButtonStyle: ButtonStyle {
+    var height: CGFloat = 44
+    var cornerRadius: CGFloat = 10
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(FittyFont.uiRegular(size: 16))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: height)
+            .background(FittyColor.accentOrange, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .opacity(configuration.isPressed ? 0.88 : 1)
+    }
+}
+
+private struct FittyRegisterButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(FittyFont.uiRegular(size: 16))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(FittyColor.accentOrange, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .opacity(configuration.isPressed ? 0.88 : 1)
+    }
+}
+
+private struct FittyGoogleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(FittyFont.uiRegular(size: 16))
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(FittyColor.cardWhite, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
+            .opacity(configuration.isPressed ? 0.88 : 1)
     }
 }
 
