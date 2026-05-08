@@ -24,6 +24,12 @@ struct OutfitPhoto: Identifiable {
     let weather: [String]
     let occasion: [String]
     let colors: [String]
+
+    /// Compressed 600px-wide version of the image for use in suggestion cards.
+    /// Falls back to full-res if the URL can't be transformed.
+    var thumbnailURL: URL {
+        imageURL.appendingSupabaseTransform(width: 600, quality: 75) ?? imageURL
+    }
 }
 
 struct OutfitMetadata {
@@ -358,6 +364,8 @@ struct SupabaseSuggestionService: SuggestionServicing {
             let leftOutfit = outfitPhotos.first(where: { $0.id == decoded.leftOutfitID }),
             let rightOutfit = outfitPhotos.first(where: { $0.id == decoded.rightOutfitID }),
             let inspirationURL = URL(string: decoded.inspiration.imageURL)
+                .flatMap({ $0.appendingSupabaseTransform(width: 600, quality: 75) })
+                ?? URL(string: decoded.inspiration.imageURL)
         else {
             throw SuggestionError.backendFailure("The suggestions service returned malformed outfit data.")
         }
@@ -755,5 +763,24 @@ private struct OpenMeteoCurrent: Decodable {
         case temperature = "temperature_2m"
         case apparentTemperature = "apparent_temperature"
         case weatherCode = "weather_code"
+    }
+}
+
+// MARK: - URL + Supabase Transform
+
+extension URL {
+    /// Appends Supabase image transform query parameters to a Supabase storage URL.
+    /// Returns nil if the URL is not a Supabase storage URL.
+    func appendingSupabaseTransform(width: Int, quality: Int) -> URL? {
+        guard host?.contains("supabase") == true || absoluteString.contains("/storage/v1/") else {
+            return nil
+        }
+        var components = URLComponents(url: self, resolvingAgainstBaseURL: false)
+        var items = components?.queryItems ?? []
+        items.removeAll { $0.name == "width" || $0.name == "quality" }
+        items.append(URLQueryItem(name: "width", value: "\(width)"))
+        items.append(URLQueryItem(name: "quality", value: "\(quality)"))
+        components?.queryItems = items
+        return components?.url
     }
 }

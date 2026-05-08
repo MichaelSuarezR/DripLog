@@ -50,13 +50,13 @@ struct SuggestionsView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 18) {
                                     closetSuggestionCard(
-                                        imageURL: suggestions.leftOutfit.imageURL,
+                                        imageURL: suggestions.leftOutfit.thumbnailURL,
                                         title: "Your Closet",
                                         detail: cardDetail(for: suggestions.leftOutfit.tags)
                                     )
                                     inspirationSuggestionCard(look: suggestions.centerInspiration)
                                     closetSuggestionCard(
-                                        imageURL: suggestions.rightOutfit.imageURL,
+                                        imageURL: suggestions.rightOutfit.thumbnailURL,
                                         title: "Your Closet",
                                         detail: cardDetail(for: suggestions.rightOutfit.tags)
                                     )
@@ -122,15 +122,10 @@ struct SuggestionsView: View {
 
     private func closetSuggestionCard(imageURL: URL, title: String, detail: String) -> some View {
         VStack(spacing: 12) {
-            AsyncImage(url: imageURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    Color.black.opacity(0.08)
-                }
+            CachedAsyncImage(url: imageURL) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
             }
             .frame(width: 286, height: 376)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -150,27 +145,10 @@ struct SuggestionsView: View {
 
     private func inspirationSuggestionCard(look: InspirationLook) -> some View {
         VStack(spacing: 12) {
-            AsyncImage(url: look.imageURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.black.opacity(0.10))
-                        .overlay {
-                            Image(systemName: "photo")
-                                .font(.title)
-                                .foregroundStyle(.black.opacity(0.28))
-                        }
-                case .empty:
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.black.opacity(0.08))
-                        .overlay { ProgressView() }
-                @unknown default:
-                    EmptyView()
-                }
+            CachedAsyncImage(url: look.imageURL) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
             }
             .frame(width: 286, height: 376)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))

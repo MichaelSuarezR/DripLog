@@ -175,7 +175,18 @@ struct HomeView: View {
 
         Task {
             do {
-                suggestions = try await suggestionProvider().makeSuggestions(for: user, outfitPhotos: outfitPhotos)
+                let result = try await suggestionProvider().makeSuggestions(for: user, outfitPhotos: outfitPhotos)
+
+                // Prefetch all images into cache while spinner is still showing.
+                // This way images appear instantly when the sheet renders.
+                let imageURLs = [
+                    result.leftOutfit.thumbnailURL,
+                    result.centerInspiration.imageURL,
+                    result.rightOutfit.thumbnailURL
+                ]
+                await ImageCache.shared.prefetch(urls: imageURLs)
+
+                suggestions = result
             } catch {
                 suggestionErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not build suggestions right now."
             }
