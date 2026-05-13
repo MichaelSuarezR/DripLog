@@ -132,15 +132,10 @@ struct ProfileTab: View {
                 ForEach(filteredOutfits) { photo in
                     VStack(alignment: .leading, spacing: 6) {
                         ZStack(alignment: .topTrailing) {
-                            AsyncImage(url: photo.imageURL) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                default:
-                                    Color.black.opacity(0.08)
-                                }
+                            CachedAsyncImage(url: photo.imageURL) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
                             }
                             .frame(height: 172)
                             .frame(maxWidth: .infinity)
