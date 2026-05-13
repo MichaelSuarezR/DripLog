@@ -174,21 +174,9 @@ private var createAccountView: some View {
     // MARK: - Sign up (Figma: 657:394)
 
     private var signUpView: some View {
-        ZStack(alignment: .topLeading) {
+        ZStack {
             FittyColor.cream
                 .ignoresSafeArea()
-
-            Button {
-                viewModel.errorMessage = nil
-                stage = .createAccount
-            } label: {
-                Image("FittySignUpBack")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 60, height: 60)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back")
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -260,26 +248,17 @@ private var createAccountView: some View {
                 .padding(.horizontal, 30)
             }
         }
+        .overlay(alignment: .topLeading) {
+            authBackButton
+        }
     }
 
     // MARK: - Sign in (Figma: welcomeback 560:559)
 
     private var signInView: some View {
-        ZStack(alignment: .topLeading) {
+        ZStack {
             FittyColor.cream
                 .ignoresSafeArea()
-
-            Button {
-                viewModel.errorMessage = nil
-                stage = .createAccount
-            } label: {
-                Image("FittySignUpBack")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 60, height: 60)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Back")
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -354,9 +333,33 @@ private var createAccountView: some View {
                 .padding(.horizontal, 30)
             }
         }
+        .overlay(alignment: .topLeading) {
+            authBackButton
+        }
     }
 
     // MARK: - Actions
+
+    private var authBackButton: some View {
+        Button {
+            focusedSignUpField = nil
+            focusedSignInField = nil
+            viewModel.errorMessage = nil
+            stage = .createAccount
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.black)
+                .frame(width: 44, height: 44)
+                .background(FittyColor.cardWhite, in: Circle())
+                .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 3)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Circle())
+        .accessibilityLabel("Back")
+        .padding(.leading, 18)
+        .padding(.top, 12)
+    }
 
     private func register() {
         viewModel.mode = .signUp

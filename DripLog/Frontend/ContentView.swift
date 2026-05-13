@@ -20,7 +20,11 @@ struct ContentView: View {
                         markOnboardingComplete(for: user.id)
                     }
                 } else {
-                    HomeView(user: user, onLogOut: authViewModel.logOut)
+                    HomeView(
+                        user: user,
+                        onUserUpdated: authViewModel.replaceCurrentUser,
+                        onLogOut: authViewModel.logOut
+                    )
                 }
             } else {
                 AuthView(viewModel: authViewModel, onSplashFinished: { splashFinished = true })

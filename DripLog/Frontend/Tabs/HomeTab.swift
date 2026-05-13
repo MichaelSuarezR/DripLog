@@ -2,14 +2,24 @@ import SwiftUI
 
 struct HomeTab: View {
     let user: AppUser
+    let onProfileTapped: () -> Void
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    Circle()
-                        .fill(Color.black.opacity(0.12))
-                        .frame(width: 50, height: 50)
+                    Button(action: onProfileTapped) {
+                        Circle()
+                            .fill(Color.black.opacity(0.12))
+                            .frame(width: 50, height: 50)
+                            .overlay {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 24, weight: .regular))
+                                    .foregroundStyle(Color.black.opacity(0.38))
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open profile")
 
                     Text("welcome, \(user.name.isEmpty ? "matthew" : user.name.lowercased())!")
                         .font(.title3.weight(.semibold))

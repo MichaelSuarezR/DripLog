@@ -27,6 +27,7 @@ struct PendingOutfitDraft: Identifiable {
 
 struct HomeView: View {
     let user: AppUser
+    let onUserUpdated: (AppUser) -> Void
     let onLogOut: () -> Void
 
     @State private var selectedTab: AppTab = .feed
@@ -38,6 +39,7 @@ struct HomeView: View {
     @State private var outfitService: OutfitServicing?
     @State private var suggestionService: SuggestionServicing?
     @State private var isSuggestionsPresented = false
+    @State private var isProfilePresented = false
     @State private var isLoadingSuggestions = false
     @State private var suggestions: OutfitSuggestions?
     @State private var suggestionErrorMessage: String?
@@ -88,6 +90,19 @@ struct HomeView: View {
                 onRetry: prepareSuggestions
             )
         }
+        .fullScreenCover(isPresented: $isProfilePresented) {
+            UserProfileView(
+                user: user,
+                onUserUpdated: onUserUpdated,
+                onClose: {
+                    isProfilePresented = false
+                },
+                onLogOut: {
+                    isProfilePresented = false
+                    onLogOut()
+                }
+            )
+        }
     }
 
     // MARK: - Tab Routing
@@ -110,7 +125,12 @@ struct HomeView: View {
                 onCapture: prepareOutfit
             )
         case .feed:
-            HomeTab(user: user)
+            HomeTab(
+                user: user,
+                onProfileTapped: {
+                    isProfilePresented = true
+                }
+            )
         }
     }
 
@@ -214,5 +234,5 @@ struct HomeView: View {
 // MARK: - Preview
 
 #Preview {
-    HomeView(user: AppUser(id: UUID(), name: "Michael", email: "michael@example.com"), onLogOut: {})
+    HomeView(user: AppUser(id: UUID(), name: "Michael", email: "michael@example.com"), onUserUpdated: { _ in }, onLogOut: {})
 }

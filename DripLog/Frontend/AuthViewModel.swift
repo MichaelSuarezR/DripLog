@@ -100,6 +100,10 @@ final class AuthViewModel: ObservableObject {
         }
     }
 
+    func replaceCurrentUser(_ user: AppUser) {
+        currentUser = user
+    }
+
     func completeOnboarding() {
         isNewUser = false
     }
