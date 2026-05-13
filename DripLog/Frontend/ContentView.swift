@@ -10,10 +10,11 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var authViewModel = AuthViewModel()
     @AppStorage("onboardingCompletedFor") private var onboardingCompletedForID = ""
+    @State private var splashFinished = false;
 
     var body: some View {
         Group {
-            if let user = authViewModel.currentUser {
+            if let user = authViewModel.currentUser, splashFinished {
                 if authViewModel.isNewUser && !hasCompletedOnboarding(for: user.id) {
                     OnboardingView {
                         markOnboardingComplete(for: user.id)
@@ -22,7 +23,7 @@ struct ContentView: View {
                     HomeView(user: user, onLogOut: authViewModel.logOut)
                 }
             } else {
-                AuthView(viewModel: authViewModel)
+                AuthView(viewModel: authViewModel, onSplashFinished: { splashFinished = true })
             }
         }
         .task {

@@ -10,6 +10,7 @@ import UIKit
 
 struct AuthView: View {
     @ObservedObject var viewModel: AuthViewModel
+    let onSplashFinished: () -> Void
     @State private var stage: Stage = .loading
 
     @State private var firstName = ""
@@ -49,11 +50,24 @@ struct AuthView: View {
         .onAppear {
             guard stage == .loading else { return }
             Task {
-                try? await Task.sleep(for: .milliseconds(1200))
-                if stage == .loading {
-                    stage = .createAccount
+                async let minimumSplash: Void = Task.sleep(for: .milliseconds(1200))
+                async let sessionCheck: Void = waitForSessionCheck()
+                _ = try? await (minimumSplash, sessionCheck)
+
+                guard stage == .loading else { return }
+                onSplashFinished()  // ← tell ContentView the splash is done
+
+                if !viewModel.isAuthenticated {
+                stage = .createAccount
                 }
             }
+
+        }
+    }
+
+    private func waitForSessionCheck() async {
+    while viewModel.isCheckingSession {
+        try? await Task.sleep(for: .milliseconds(50))
         }
     }
 
@@ -79,27 +93,39 @@ struct AuthView: View {
     }
 
     // MARK: - Create account (Figma: 560:551)
+    // MARK: - Create account (Figma: 560:551)
 
-    private var createAccountView: some View {
+private var createAccountView: some View {
+    GeometryReader { geo in
+        let cardHeight: CGFloat = min(454, geo.size.height * 0.52)
+        let logoAreaHeight: CGFloat = geo.size.height - cardHeight
+
         ZStack(alignment: .bottom) {
             FittyColor.cream
                 .ignoresSafeArea()
 
+            // Logo + illustration pinned to the top portion
             VStack(spacing: 0) {
                 Text("Fitty")
                     .font(FittyFont.logo(size: 50))
                     .foregroundStyle(.black)
-                    .padding(.top, 56)
+                    .padding(.top, max(geo.safeAreaInsets.top + 16, 40))
 
+                // Illustration scales to fill whatever vertical room remains
+                // above the card, minus the logo (~80pt) and a little padding
+                let illustrationSize = max(logoAreaHeight - 100, 120)
                 Image("FittyCreateAccountIllustration")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 349, height: 349)
+                    .frame(width: illustrationSize, height: illustrationSize)
                     .padding(.top, 8)
 
                 Spacer(minLength: 0)
             }
+            // Keep the VStack from sliding under the card
+            .padding(.bottom, cardHeight)
 
+            // White card — height is capped so it never swallows the logo
             VStack(spacing: 10) {
                 Text("Create Account")
                     .font(FittyFont.uiBold(size: 24))
@@ -124,16 +150,26 @@ struct AuthView: View {
                 }
                 .buttonStyle(FittyPrimaryCTAButtonStyle(height: 44, cornerRadius: 10))
 
-                Spacer(minLength: 32)
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 62)
             .padding(.top, 36)
             .frame(maxWidth: .infinity)
-            .frame(height: 454)
-            .background(FittyColor.cardWhite, in: UnevenRoundedRectangle(topLeadingRadius: 30, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 30, style: .continuous))
+            .frame(height: cardHeight)
+            .background(
+                FittyColor.cardWhite,
+                in: UnevenRoundedRectangle(
+                    topLeadingRadius: 30,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 30,
+                    style: .continuous
+                )
+            )
         }
         .ignoresSafeArea(edges: .bottom)
     }
+}
 
     // MARK: - Sign up (Figma: 657:394)
 
@@ -572,5 +608,5 @@ private struct FittyGoogleButtonStyle: ButtonStyle {
 }
 
 #Preview {
-    AuthView(viewModel: AuthViewModel())
+    AuthView(viewModel: AuthViewModel(), onSplashFinished: {})
 }
