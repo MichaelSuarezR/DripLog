@@ -8,6 +8,7 @@
 import Foundation
 import Supabase
 import UIKit
+internal import AuthenticationServices
 
 struct AppUser: Equatable {
     let id: UUID
@@ -45,6 +46,7 @@ protocol AuthServicing {
     func currentUser() async throws -> AppUser?
     func signUp(name: String, email: String, password: String) async throws -> AppUser
     func logIn(email: String, password: String) async throws -> AppUser
+    func signInWithGoogle() async throws -> AppUser
     func updateAccount(userID: UUID, firstName: String, lastName: String, email: String) async throws -> AppUser
     func fetchProfilePhotoURL(for userID: UUID) async throws -> URL?
     func updateProfilePhoto(_ image: UIImage, for userID: UUID) async throws -> URL
@@ -61,6 +63,10 @@ struct MissingConfigurationAuthService: AuthServicing {
     }
 
     func logIn(email: String, password: String) async throws -> AppUser {
+        throw AuthError.missingSupabaseConfiguration
+    }
+
+    func signInWithGoogle() async throws -> AppUser {
         throw AuthError.missingSupabaseConfiguration
     }
 
@@ -233,6 +239,16 @@ struct SupabaseAuthService: AuthServicing {
             .createSignedURL(path: path, expiresIn: 3600)
     }
 
+    func signInWithGoogle() async throws -> AppUser {
+        let session = try await client.auth.signInWithOAuth(
+            provider: .google,
+            redirectTo: URL(string: "fitty://")
+        ) { webSession in
+            webSession.prefersEphemeralWebBrowserSession = true
+        }
+        return try await appUser(from: session.user)
+    }
+
     func logOut() async throws {
         try await client.auth.signOut()
     }
@@ -341,3 +357,4 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
+

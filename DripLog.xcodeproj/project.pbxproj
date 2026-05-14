@@ -38,9 +38,22 @@
 		B00FB4412F9829650052F38B /* DripLogUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DripLogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		83139FFA2FB653C8006BCD56 /* Exceptions for "DripLog" folder in "DripLog" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B00FB4292F9829630052F38B /* DripLog */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B00FB42C2F9829630052F38B /* DripLog */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				83139FFA2FB653C8006BCD56 /* Exceptions for "DripLog" folder in "DripLog" target */,
+			);
 			path = DripLog;
 			sourceTree = "<group>";
 		};
@@ -429,6 +442,7 @@
 				DEVELOPMENT_TEAM = KWMC87T595;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DripLog/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take outfit photos to save to your profile.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "DripLog uses your location to check the weather and suggest outfits for today.";
 				INFOPLIST_KEY_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvd2ZnZGxjcXRncHJhaXptb29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTc2MDUsImV4cCI6MjA5MjM3MzYwNX0.rW8Ug2NAMaMsTD_WTVzllpZ_Yc3kBohpsD0u6wYyWGc;
@@ -467,6 +481,7 @@
 				DEVELOPMENT_TEAM = KWMC87T595;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DripLog/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take outfit photos to save to your profile.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "DripLog uses your location to check the weather and suggest outfits for today.";
 				INFOPLIST_KEY_SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlvd2ZnZGxjcXRncHJhaXptb29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3OTc2MDUsImV4cCI6MjA5MjM3MzYwNX0.rW8Ug2NAMaMsTD_WTVzllpZ_Yc3kBohpsD0u6wYyWGc;

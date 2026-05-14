@@ -24,7 +24,10 @@ enum SupabaseClientProvider {
             supabaseURL: configuration.projectURL,
             supabaseKey: configuration.anonKey,
             options: SupabaseClientOptions(
-                auth: .init(emitLocalSessionAsInitialSession: true)
+                auth: .init(
+                    flowType: .implicit,
+                    emitLocalSessionAsInitialSession: true
+                )
             )
         )
 

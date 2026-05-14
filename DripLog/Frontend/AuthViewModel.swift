@@ -5,6 +5,7 @@
 //  Created by Michael Suarez-Russell on 4/21/26.
 //
 
+internal import AuthenticationServices
 import Combine
 import Foundation
 
@@ -82,6 +83,22 @@ final class AuthViewModel: ObservableObject {
                 }
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? "Something went wrong."
+            }
+        }
+    }
+
+    func signInWithGoogle() {
+        errorMessage = nil
+        Task {
+            isWorking = true
+            defer { isWorking = false }
+            do {
+                currentUser = try await service().signInWithGoogle()
+                isNewUser = false
+            } catch {
+                let nsError = error as NSError
+                guard !(nsError.domain == "com.apple.AuthenticationServices.WebAuthenticationSession" && nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue) else { return }
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? "Google sign-in failed."
             }
         }
     }
