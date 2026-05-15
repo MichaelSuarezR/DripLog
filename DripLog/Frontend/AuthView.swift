@@ -55,19 +55,18 @@ struct AuthView: View {
                 _ = try? await (minimumSplash, sessionCheck)
 
                 guard stage == .loading else { return }
-                onSplashFinished()  // ← tell ContentView the splash is done
+                onSplashFinished()
 
                 if !viewModel.isAuthenticated {
-                stage = .createAccount
+                    stage = .createAccount
                 }
             }
-
         }
     }
 
     private func waitForSessionCheck() async {
-    while viewModel.isCheckingSession {
-        try? await Task.sleep(for: .milliseconds(50))
+        while viewModel.isCheckingSession {
+            try? await Task.sleep(for: .milliseconds(50))
         }
     }
 
@@ -93,90 +92,96 @@ struct AuthView: View {
     }
 
     // MARK: - Create account (Figma: 560:551)
-    // MARK: - Create account (Figma: 560:551)
 
-private var createAccountView: some View {
-    GeometryReader { geo in
-        let cardHeight: CGFloat = min(454, geo.size.height * 0.52)
-        let logoAreaHeight: CGFloat = geo.size.height - cardHeight
+    private var createAccountView: some View {
+        GeometryReader { geo in
+            let cardHeight: CGFloat = min(454, geo.size.height * 0.52)
+            let logoAreaHeight: CGFloat = geo.size.height - cardHeight
 
-        ZStack(alignment: .bottom) {
-            FittyColor.cream
-                .ignoresSafeArea()
+            ZStack(alignment: .bottom) {
+                FittyColor.cream
+                    .ignoresSafeArea()
 
-            // Logo + illustration pinned to the top portion
-            VStack(spacing: 0) {
-                Text("Fitty")
-                    .font(FittyFont.logo(size: 50))
-                    .foregroundStyle(.black)
-                    .padding(.top, max(geo.safeAreaInsets.top + 16, 40))
+                VStack(spacing: 0) {
+                    Text("Fitty")
+                        .font(FittyFont.logo(size: 50))
+                        .foregroundStyle(.black)
+                        .padding(.top, max(geo.safeAreaInsets.top + 16, 40))
 
-                // Illustration scales to fill whatever vertical room remains
-                // above the card, minus the logo (~80pt) and a little padding
-                let illustrationSize = max(logoAreaHeight - 100, 120)
-                Image("FittyCreateAccountIllustration")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: illustrationSize, height: illustrationSize)
-                    .padding(.top, 8)
+                    let illustrationSize = max(logoAreaHeight - 100, 120)
+                    Image("FittyCreateAccountIllustration")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: illustrationSize, height: illustrationSize)
+                        .padding(.top, 8)
 
-                Spacer(minLength: 0)
-            }
-            // Keep the VStack from sliding under the card
-            .padding(.bottom, cardHeight)
-
-            // White card — height is capped so it never swallows the logo
-            VStack(spacing: 10) {
-                Text("Create Account")
-                    .font(FittyFont.uiBold(size: 24))
-                    .foregroundStyle(.black)
-
-                Text("Ready to get fitty?")
-                    .font(FittyFont.uiLight(size: 16))
-                    .foregroundStyle(.black)
-                    .padding(.bottom, 8)
-
-                Button("Get Started") {
-                    viewModel.mode = .signUp
-                    viewModel.errorMessage = nil
-                    stage = .signUp
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(FittyPrimaryCTAButtonStyle(height: 44, cornerRadius: 10))
+                .padding(.bottom, cardHeight)
 
-                Button("Sign in") {
-                    viewModel.mode = .logIn
-                    viewModel.errorMessage = nil
-                    stage = .signIn
+                VStack(spacing: 10) {
+                    Text("Create Account")
+                        .font(FittyFont.uiBold(size: 24))
+                        .foregroundStyle(.black)
+
+                    Text("Ready to get fitty?")
+                        .font(FittyFont.uiLight(size: 16))
+                        .foregroundStyle(.black)
+                        .padding(.bottom, 8)
+
+                    Button("Get Started") {
+                        viewModel.mode = .signUp
+                        viewModel.errorMessage = nil
+                        stage = .signUp
+                    }
+                    .buttonStyle(FittyPrimaryCTAButtonStyle(height: 44, cornerRadius: 10))
+
+                    Button("Sign in") {
+                        viewModel.mode = .logIn
+                        viewModel.errorMessage = nil
+                        stage = .signIn
+                    }
+                    .buttonStyle(FittyPrimaryCTAButtonStyle(height: 44, cornerRadius: 10))
+
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(FittyPrimaryCTAButtonStyle(height: 44, cornerRadius: 10))
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 62)
-            .padding(.top, 36)
-            .frame(maxWidth: .infinity)
-            .frame(height: cardHeight)
-            .background(
-                FittyColor.cardWhite,
-                in: UnevenRoundedRectangle(
-                    topLeadingRadius: 30,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 30,
-                    style: .continuous
+                .padding(.horizontal, 62)
+                .padding(.top, 36)
+                .frame(maxWidth: .infinity)
+                .frame(height: cardHeight)
+                .background(
+                    FittyColor.cardWhite,
+                    in: UnevenRoundedRectangle(
+                        topLeadingRadius: 30,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 30,
+                        style: .continuous
+                    )
                 )
-            )
+            }
+            .ignoresSafeArea(edges: .bottom)
         }
-        .ignoresSafeArea(edges: .bottom)
     }
-}
 
     // MARK: - Sign up (Figma: 657:394)
 
     private var signUpView: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             FittyColor.cream
                 .ignoresSafeArea()
+
+            Button {
+                viewModel.errorMessage = nil
+                stage = .createAccount
+            } label: {
+                Image("FittySignUpBack")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -238,7 +243,7 @@ private var createAccountView: some View {
                     .padding(.top, 28)
 
                     Button("Google") {
-                        viewModel.signInWithGoogle()
+                        // OAuth not wired; email/password auth is functional via Supabase.
                     }
                     .buttonStyle(FittyGoogleButtonStyle())
                     .padding(.top, 12)
@@ -248,17 +253,26 @@ private var createAccountView: some View {
                 .padding(.horizontal, 30)
             }
         }
-        .overlay(alignment: .topLeading) {
-            authBackButton
-        }
     }
 
     // MARK: - Sign in (Figma: welcomeback 560:559)
 
     private var signInView: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             FittyColor.cream
                 .ignoresSafeArea()
+
+            Button {
+                viewModel.errorMessage = nil
+                stage = .createAccount
+            } label: {
+                Image("FittySignUpBack")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -267,7 +281,7 @@ private var createAccountView: some View {
                         .padding(.top, 88)
 
                     HStack(spacing: 0) {
-                        Text("Don’t have an account? ")
+                        Text("Don't have an account? ")
                             .font(FittyFont.uiRegular(size: 12))
                             .foregroundStyle(Color(hex: 0x1B1919))
                         Button("Sign Up") {
@@ -324,44 +338,18 @@ private var createAccountView: some View {
                     }
                     .padding(.top, 28)
 
-                    Button("Google") {
-                        viewModel.signInWithGoogle()
-                    }
-                    .buttonStyle(FittyGoogleButtonStyle())
-                    .padding(.top, 12)
+                    Button("Google") {}
+                        .buttonStyle(FittyGoogleButtonStyle())
+                        .padding(.top, 12)
 
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 30)
             }
         }
-        .overlay(alignment: .topLeading) {
-            authBackButton
-        }
     }
 
     // MARK: - Actions
-
-    private var authBackButton: some View {
-        Button {
-            focusedSignUpField = nil
-            focusedSignInField = nil
-            viewModel.errorMessage = nil
-            stage = .createAccount
-        } label: {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(width: 44, height: 44)
-                .background(FittyColor.cardWhite, in: Circle())
-                .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 3)
-        }
-        .buttonStyle(.plain)
-        .contentShape(Circle())
-        .accessibilityLabel("Back")
-        .padding(.leading, 18)
-        .padding(.top, 12)
-    }
 
     private func register() {
         viewModel.mode = .signUp
@@ -372,7 +360,7 @@ private var createAccountView: some View {
         viewModel.submit()
     }
 
-    // MARK: - Fields
+    // MARK: - Fields (SignUp variants)
 
     private func fittyTextField(
         title: String,
@@ -400,9 +388,7 @@ private var createAccountView: some View {
                 .focused(focused, equals: equals)
                 .submitLabel(submit == nil ? .done : .next)
                 .onSubmit {
-                    if let submit {
-                        focused.wrappedValue = submit
-                    }
+                    if let submit { focused.wrappedValue = submit }
                 }
         }
         .frame(height: 44)
@@ -432,15 +418,15 @@ private var createAccountView: some View {
                 .focused(focused, equals: equals)
                 .submitLabel(submit == nil ? .done : .next)
                 .onSubmit {
-                    if let submit {
-                        focused.wrappedValue = submit
-                    }
+                    if let submit { focused.wrappedValue = submit }
                 }
         }
         .frame(height: 44)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
     }
+
+    // MARK: - Fields (SignIn variants)
 
     private func fittyTextField(
         title: String,
@@ -468,9 +454,7 @@ private var createAccountView: some View {
                 .focused(focused, equals: equals)
                 .submitLabel(submit == nil ? .done : .next)
                 .onSubmit {
-                    if let submit {
-                        focused.wrappedValue = submit
-                    }
+                    if let submit { focused.wrappedValue = submit }
                 }
         }
         .frame(height: 44)
@@ -500,9 +484,7 @@ private var createAccountView: some View {
                 .focused(focused, equals: equals)
                 .submitLabel(submit == nil ? .done : .next)
                 .onSubmit {
-                    if let submit {
-                        focused.wrappedValue = submit
-                    }
+                    if let submit { focused.wrappedValue = submit }
                 }
         }
         .frame(height: 44)
@@ -511,7 +493,7 @@ private var createAccountView: some View {
     }
 }
 
-// MARK: - Design tokens (Figma driplog-5-5)
+// MARK: - Design tokens
 
 private enum FittyColor {
     static let loadingBackground = Color(hex: 0x4597B7)
@@ -521,35 +503,34 @@ private enum FittyColor {
     static let linkBlue = Color(hex: 0x4597B7)
 }
 
-/// Uses **GoodKitty** / **Coolvetica** when bundled in the app; otherwise closest system fonts.
-/// Add `GoodKitty-Regular.ttf` and Coolvetica variants to the target and list them under `UIAppFonts` in Info.plist for a pixel match.
 private enum FittyFont {
+    // GoodKitty — PostScript name: "GoodKitty"
     static func logo(size: CGFloat) -> Font {
-        if let name = firstAvailableFont(baseNames: ["GoodKitty-Regular", "GoodKitty"], size: size) {
-            return .custom(name, size: size)
-        }
-        return .system(size: size, weight: .light, design: .rounded)
+        .custom("GoodKitty", size: size)
     }
 
+    // Coolvetica Bold — update "Coolvetica-Bold" to match your file's PostScript name if needed
     static func uiBold(size: CGFloat) -> Font {
-        if let name = firstAvailableFont(baseNames: ["CoolveticaRg-Bold", "Coolvetica-Bold", "Coolvetica Bold"], size: size) {
+        if let name = firstAvailableFont(baseNames: ["Coolvetica-Bold", "CoolveticaRg-Bold"], size: size) {
             return .custom(name, size: size)
         }
-        return .system(size: size, weight: .bold, design: .default)
+        return .system(size: size, weight: .bold)
     }
 
+    // Coolvetica Book Regular — PostScript name: "CoolveticaBk-Regular"
     static func uiRegular(size: CGFloat) -> Font {
-        if let name = firstAvailableFont(baseNames: ["CoolveticaRg-Regular", "Coolvetica-Regular", "Coolvetica"], size: size) {
+        if let name = firstAvailableFont(baseNames: ["CoolveticaBk-Regular", "Coolvetica-Regular", "CoolveticaRg-Regular"], size: size) {
             return .custom(name, size: size)
         }
-        return .system(size: size, weight: .regular, design: .default)
+        return .system(size: size, weight: .regular)
     }
 
+    // Coolvetica Light — update if you add that weight later
     static func uiLight(size: CGFloat) -> Font {
-        if let name = firstAvailableFont(baseNames: ["CoolveticaRg-Light", "Coolvetica-Light"], size: size) {
+        if let name = firstAvailableFont(baseNames: ["CoolveticaRg-Light", "Coolvetica-Light", "CoolveticaBk-Regular"], size: size) {
             return .custom(name, size: size)
         }
-        return .system(size: size, weight: .light, design: .default)
+        return .system(size: size, weight: .light)
     }
 
     private static func firstAvailableFont(baseNames: [String], size: CGFloat) -> String? {

@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03504AD92FB6CF070093F895 /* Coolvetica-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = 03504AD82FB6CF070093F895 /* Coolvetica-Bold.otf */; };
+		03504ADB2FB6CF220093F895 /* Coolvetica-Book-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 03504ADA2FB6CF220093F895 /* Coolvetica-Book-Regular.otf */; };
+		03504ADD2FB6CF3B0093F895 /* Coolvetica-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = 03504ADC2FB6CF3B0093F895 /* Coolvetica-Regular.otf */; };
+		03504ADF2FB6CF4A0093F895 /* GoodKitty Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 03504ADE2FB6CF4A0093F895 /* GoodKitty Regular.ttf */; };
 		B00FB4862F9831710052F38B /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = B00FB4852F9831710052F38B /* Auth */; };
 		B00FB4882F9831710052F38B /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = B00FB4872F9831710052F38B /* PostgREST */; };
 		B00FB48A2F9831710052F38B /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = B00FB4892F9831710052F38B /* Storage */; };
@@ -31,6 +35,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		03504AD82FB6CF070093F895 /* Coolvetica-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Coolvetica-Bold.otf"; sourceTree = "<group>"; };
+		03504ADA2FB6CF220093F895 /* Coolvetica-Book-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Coolvetica-Book-Regular.otf"; sourceTree = "<group>"; };
+		03504ADC2FB6CF3B0093F895 /* Coolvetica-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Coolvetica-Regular.otf"; sourceTree = "<group>"; };
+		03504ADE2FB6CF4A0093F895 /* GoodKitty Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GoodKitty Regular.ttf"; sourceTree = "<group>"; };
 		AA0000000000000000000001 /* Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig; sourceTree = "<group>"; };
 		AA0000000000000000000002 /* Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig.example; sourceTree = "<group>"; };
 		B00FB42A2F9829630052F38B /* DripLog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DripLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -39,7 +47,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		83139FFA2FB653C8006BCD56 /* Exceptions for "DripLog" folder in "DripLog" target */ = {
+		03504AE02FB6D1BA0093F895 /* Exceptions for "DripLog" folder in "DripLog" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -52,7 +60,7 @@
 		B00FB42C2F9829630052F38B /* DripLog */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				83139FFA2FB653C8006BCD56 /* Exceptions for "DripLog" folder in "DripLog" target */,
+				03504AE02FB6D1BA0093F895 /* Exceptions for "DripLog" folder in "DripLog" target */,
 			);
 			path = DripLog;
 			sourceTree = "<group>";
@@ -110,6 +118,10 @@
 		B00FB4212F9829630052F38B = {
 			isa = PBXGroup;
 			children = (
+				03504ADE2FB6CF4A0093F895 /* GoodKitty Regular.ttf */,
+				03504ADC2FB6CF3B0093F895 /* Coolvetica-Regular.otf */,
+				03504AD82FB6CF070093F895 /* Coolvetica-Bold.otf */,
+				03504ADA2FB6CF220093F895 /* Coolvetica-Book-Regular.otf */,
 				AA0000000000000000000003 /* Config */,
 				B00FB42C2F9829630052F38B /* DripLog */,
 				B00FB43A2F9829650052F38B /* DripLogTests */,
@@ -255,6 +267,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				03504AD92FB6CF070093F895 /* Coolvetica-Bold.otf in Resources */,
+				03504ADD2FB6CF3B0093F895 /* Coolvetica-Regular.otf in Resources */,
+				03504ADB2FB6CF220093F895 /* Coolvetica-Book-Regular.otf in Resources */,
+				03504ADF2FB6CF4A0093F895 /* GoodKitty Regular.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
