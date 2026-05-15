@@ -4,6 +4,13 @@ struct HomeTab: View {
     let user: AppUser
     let onProfileTapped: () -> Void
 
+    @State private var posts: [FeedPost] = []
+    @State private var currentPage = 0
+    @State private var isLoading = false
+    @State private var hasMore = true
+    @State private var errorMessage: String?
+    @State private var feedService: (any FeedServicing)?
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -46,8 +53,33 @@ struct HomeTab: View {
                     }
                     .padding(.bottom, 2)
 
-                    FeedPostPlaceholder(author: "vicky", followTitle: "following", showsTags: true)
-                    FeedPostPlaceholder(author: "cecile", followTitle: "follow", showsTags: false)
+                    if posts.isEmpty && isLoading {
+                        ProgressView()
+                            .padding(.top, 40)
+                    } else if let errorMessage {
+                        Text(errorMessage)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 40)
+                    } else {
+                        ForEach(posts) { post in
+                            FeedPostCard(post: post)
+                        }
+
+                        if hasMore {
+                            ProgressView()
+                                .padding(.vertical, 16)
+                                .onAppear {
+                                    Task { await loadNextPage() }
+                                }
+                        } else if !posts.isEmpty {
+                            Text("you're all caught up")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.vertical, 16)
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 14)
@@ -55,11 +87,104 @@ struct HomeTab: View {
             }
             .navigationTitle("Feed")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await loadNextPage() }
         }
+    }
+
+    private func loadNextPage() async {
+        guard !isLoading && hasMore else { return }
+        isLoading = true
+        do {
+            let service = try getService()
+            let newPosts = try await service.fetchFeedPosts(page: currentPage)
+            posts.append(contentsOf: newPosts)
+            currentPage += 1
+            if newPosts.count < 5 { hasMore = false }
+        } catch {
+            errorMessage = "Could not load feed right now."
+            hasMore = false
+        }
+        isLoading = false
+    }
+
+    private func getService() throws -> any FeedServicing {
+        if let feedService { return feedService }
+        let service = try SupabaseFeedService()
+        feedService = service
+        return service
     }
 }
 
-// MARK: - Feed Supporting Views
+// MARK: - FeedPostCard
+
+struct FeedPostCard: View {
+    let post: FeedPost
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Circle()
+                    .fill(Color.black.opacity(0.12))
+                    .frame(width: 33, height: 33)
+                Text(post.authorName.lowercased())
+                    .font(.title3.weight(.semibold))
+                Spacer()
+                Text("follow")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 120, height: 33)
+                    .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            }
+
+            CachedAsyncImage(url: post.imageURL) { image in
+                image
+                    .resizable()
+                    .scaledToFill()
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 373)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipped()
+
+            HStack {
+                Text("OOTD")
+                    .font(.headline.weight(.semibold))
+                Spacer()
+                Image(systemName: "message")
+                Image(systemName: "heart")
+                Image(systemName: "bookmark")
+            }
+            .font(.title3)
+
+            Text(Self.dateFormatter.string(from: post.createdAt).lowercased())
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if !post.tags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(post.tags.prefix(4), id: \.self) { tag in
+                            Text(tag.lowercased())
+                                .font(.caption2)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(Color.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.bottom, 10)
+    }
+}
+
+// MARK: - FeedFilterChip
 
 struct FeedFilterChip: View {
     let title: String
@@ -75,70 +200,5 @@ struct FeedFilterChip: View {
                 isActive ? Color.black.opacity(0.25) : Color.black.opacity(0.08),
                 in: RoundedRectangle(cornerRadius: 14.5, style: .continuous)
             )
-    }
-}
-
-struct FeedPostPlaceholder: View {
-    let author: String
-    let followTitle: String
-    let showsTags: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Circle()
-                    .fill(Color.black.opacity(0.12))
-                    .frame(width: 33, height: 33)
-
-                Text(author)
-                    .font(.title3.weight(.semibold))
-
-                Spacer()
-
-                Text(followTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .frame(width: 120, height: 33)
-                    .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            }
-
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.black.opacity(0.08))
-                .frame(height: 373)
-
-            HStack {
-                Text("OOTD")
-                    .font(.headline.weight(.semibold))
-                Spacer()
-                Image(systemName: "message")
-                Image(systemName: "heart")
-                Image(systemName: "bookmark")
-            }
-            .font(.title3)
-
-            Text("april 20, 2026")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text("sacccacsasakccndndpwqjdpqwjdwjqpdjwqdwqdqwdqwndwqdd")
-                .font(.caption2)
-                .lineLimit(2)
-
-            if showsTags {
-                HStack(spacing: 8) {
-                    Text("Brown Leather Belt")
-                        .font(.caption2)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(Color.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                    Text("Black Top")
-                        .font(.caption2)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(Color.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-            }
-        }
-        .padding(.bottom, 10)
     }
 }
