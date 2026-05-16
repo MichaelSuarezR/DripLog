@@ -243,7 +243,7 @@ struct AuthView: View {
                     .padding(.top, 28)
 
                     Button("Google") {
-                        // OAuth not wired; email/password auth is functional via Supabase.
+                        viewModel.signInWithGoogle()
                     }
                     .buttonStyle(FittyGoogleButtonStyle())
                     .padding(.top, 12)
@@ -338,9 +338,11 @@ struct AuthView: View {
                     }
                     .padding(.top, 28)
 
-                    Button("Google") {}
-                        .buttonStyle(FittyGoogleButtonStyle())
-                        .padding(.top, 12)
+                    Button("Google") {
+                        viewModel.signInWithGoogle()
+                    }
+                    .buttonStyle(FittyGoogleButtonStyle())
+                    .padding(.top, 12)
 
                     Spacer(minLength: 40)
                 }

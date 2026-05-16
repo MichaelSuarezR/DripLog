@@ -12,6 +12,7 @@ struct OutfitUploadTaggingView: View {
     @State private var tagInput = ""
     @State private var isSaving = false
     @State private var saveError: String?
+    @State private var isAutoTagging = false
 
     private let suggestedTags = [
         "Black Top",
@@ -45,6 +46,7 @@ struct OutfitUploadTaggingView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     header
                     promptRow
+                    autoTagIndicator
                     tagChips
                     metadataSections
 
@@ -70,6 +72,7 @@ struct OutfitUploadTaggingView: View {
                 .padding(.bottom, 32)
             }
             .background(Color.white)
+            .task { await performAutoTag() }
         }
     }
 
@@ -130,6 +133,22 @@ struct OutfitUploadTaggingView: View {
                 .frame(width: 82, height: 82)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .clipped()
+        }
+    }
+
+    // MARK: - Auto-Tag Indicator
+
+    @ViewBuilder
+    private var autoTagIndicator: some View {
+        if isAutoTagging {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .scaleEffect(0.75)
+                Text("Auto-tagging your outfit...")
+                    .font(.caption)
+                    .foregroundStyle(Color.black.opacity(0.45))
+            }
+            .padding(.top, 10)
         }
     }
 
@@ -329,6 +348,31 @@ struct OutfitUploadTaggingView: View {
         }
         filters.custom.insert(tag)
         tagInput = ""
+    }
+
+    // MARK: - Auto-Tag
+
+    private func performAutoTag() async {
+        guard let service = try? SupabaseAutoTagService() else { return }
+        isAutoTagging = true
+        defer { isAutoTagging = false }
+
+        guard let result = try? await service.autoTag(image: image) else { return }
+
+        let autoFilters = ClosetFilters(metadata: result)
+        filters.topCategories.formUnion(autoFilters.topCategories)
+        filters.bottomCategories.formUnion(autoFilters.bottomCategories)
+        filters.outerwearCategories.formUnion(autoFilters.outerwearCategories)
+        filters.shoesCategories.formUnion(autoFilters.shoesCategories)
+        filters.accessoriesCategories.formUnion(autoFilters.accessoriesCategories)
+        filters.weather.formUnion(autoFilters.weather)
+        filters.occasion.formUnion(autoFilters.occasion)
+        filters.colors.formUnion(autoFilters.colors)
+
+        if autoFilters.categorySelectionCount > 0 { expandedSections.insert(.categories) }
+        if !autoFilters.weather.isEmpty  { expandedSections.insert(.weather) }
+        if !autoFilters.occasion.isEmpty { expandedSections.insert(.occasion) }
+        if !autoFilters.colors.isEmpty   { expandedSections.insert(.colors) }
     }
 
     // MARK: - Actions

@@ -125,6 +125,10 @@ protocol SuggestionServicing {
     func makeSuggestions(for user: AppUser, outfitPhotos: [OutfitPhoto]) async throws -> OutfitSuggestions
 }
 
+protocol AutoTagServicing {
+    func autoTag(image: UIImage) async throws -> OutfitMetadata
+}
+
 struct SupabaseOutfitService: OutfitServicing {
     private let client: SupabaseClient
     private let bucketName = "outfit-photos"
@@ -396,6 +400,93 @@ struct SupabaseSuggestionService: SuggestionServicing {
             explanation: decoded.explanation
         )
     }
+}
+
+struct SupabaseAutoTagService: AutoTagServicing {
+    private let client: SupabaseClient
+    private let configuration: SupabaseConfiguration
+
+    init(client: SupabaseClient? = nil, configuration: SupabaseConfiguration? = .current) throws {
+        self.client = try client ?? SupabaseClientProvider.makeClient(configuration: configuration)
+        guard let configuration else {
+            throw AuthError.missingSupabaseConfiguration
+        }
+        self.configuration = configuration
+    }
+
+    func autoTag(image: UIImage) async throws -> OutfitMetadata {
+        guard let accessToken = client.auth.currentSession?.accessToken else {
+            throw AutoTagError.notLoggedIn
+        }
+
+        guard let imageData = resizedImageData(image) else {
+            throw AutoTagError.imageEncodingFailed
+        }
+
+        let payload = AutoTagRequest(imageBase64: imageData.base64EncodedString(), mimeType: "image/jpeg")
+
+        var request = URLRequest(url: configuration.projectURL.appending(path: "functions/v1/auto-tag-outfit"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(configuration.anonKey, forHTTPHeaderField: "apikey")
+        request.httpBody = try JSONEncoder().encode(payload)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, 200..<300 ~= httpResponse.statusCode else {
+            throw AutoTagError.backendFailed
+        }
+
+        let decoded = try JSONDecoder().decode(AutoTagResponse.self, from: data)
+        return OutfitMetadata(
+            customTags: [],
+            categories: decoded.categories,
+            weather: decoded.weather,
+            occasion: decoded.occasion,
+            colors: decoded.colors
+        )
+    }
+
+    private func resizedImageData(_ image: UIImage, maxDimension: CGFloat = 1024) -> Data? {
+        let size = image.size
+        let scale = min(maxDimension / max(size.width, size.height), 1)
+        let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: targetSize)) }
+            .jpegData(compressionQuality: 0.7)
+    }
+}
+
+enum AutoTagError: LocalizedError {
+    case notLoggedIn
+    case imageEncodingFailed
+    case backendFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .notLoggedIn:       "You must be logged in to use auto-tagging."
+        case .imageEncodingFailed: "Could not encode the photo for auto-tagging."
+        case .backendFailed:     "Auto-tagging failed."
+        }
+    }
+}
+
+private struct AutoTagRequest: Encodable {
+    let imageBase64: String
+    let mimeType: String
+
+    enum CodingKeys: String, CodingKey {
+        case imageBase64 = "image_base64"
+        case mimeType = "mime_type"
+    }
+}
+
+private struct AutoTagResponse: Decodable {
+    let categories: [String]
+    let weather: [String]
+    let occasion: [String]
+    let colors: [String]
 }
 
 private struct OutfitRow: Decodable {
