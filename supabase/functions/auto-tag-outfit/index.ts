@@ -119,6 +119,7 @@ async function tagWithGemini(
     throw new Error('Gemini returned no content.')
   }
 
+  console.log('Gemini usage:', JSON.stringify(data.usageMetadata))
   const parsed = JSON.parse(content)
 
   const categorySet = new Set(CATEGORIES)
