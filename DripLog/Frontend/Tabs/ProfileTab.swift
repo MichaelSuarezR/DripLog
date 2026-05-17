@@ -3,12 +3,19 @@ import SwiftUI
 struct ProfileTab: View {
     let user: AppUser
     let outfitPhotos: [OutfitPhoto]
+    let isLoadingOutfits: Bool
+    let errorMessage: String?
     let onLogOut: () -> Void
     let onEditOutfit: (OutfitPhoto) -> Void
     let onAskForSuggestions: () -> Void
+    let onProfileTapped: () -> Void
+    let onLoadOutfits: () async -> Void
+    let onRefreshOutfits: () async -> Void
 
     @State private var isFilterPresented = false
     @State private var filters = ClosetFilters()
+    @State private var profilePhotoURL: URL?
+    @State private var authService: AuthServicing?
 
     private let columns = [
         GridItem(.flexible(), spacing: 14),
@@ -22,6 +29,11 @@ struct ProfileTab: View {
                     headerRow
                     inspirationBanner
                     closetHeader
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.red)
+                    }
                     outfitsSection
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -30,6 +42,15 @@ struct ProfileTab: View {
                 .padding(.bottom, 110)
             }
             .background(Color.white)
+            .onAppear {
+                Task {
+                    await onLoadOutfits()
+                    await loadProfilePhoto()
+                }
+            }
+            .refreshable {
+                await onRefreshOutfits()
+            }
             .toolbar(.hidden, for: .navigationBar)
             .fullScreenCover(isPresented: $isFilterPresented) {
                 ClosetFilterView(filters: $filters)
@@ -54,13 +75,11 @@ struct ProfileTab: View {
                     .fill(Color.black.opacity(0.14))
                     .frame(width: 22, height: 22)
 
-                Menu {
-                    Button("Log Out", role: .destructive, action: onLogOut)
-                } label: {
-                    Circle()
-                        .fill(Color.black.opacity(0.14))
-                        .frame(width: 30, height: 30)
+                Button(action: onProfileTapped) {
+                    ClosetProfileAvatar(url: profilePhotoURL)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open profile")
             }
         }
         .padding(.top, 12)
@@ -70,36 +89,28 @@ struct ProfileTab: View {
         Button {
             onAskForSuggestions()
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(Color.white.opacity(0.16), in: Circle())
+            ZStack {
+                RoundedRectangle(cornerRadius: 42, style: .continuous)
+                    .fill(Color(red: 0.27, green: 0.62, blue: 0.74))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 42, style: .continuous)
+                            .stroke(Color(red: 0.46, green: 0.54, blue: 0.59), lineWidth: 4)
+                    }
 
-                Text("don't know what to wear?")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-
-                Spacer()
+                Image("dkwtw")
+                    .resizable()
+                    .scaledToFill()
+                    .scaleEffect(1.08)
+                    .offset(x: -2.5, y: 0)
             }
-            .padding(.horizontal, 18)
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.70, green: 0.68, blue: 0.69),
-                        Color(red: 0.62, green: 0.60, blue: 0.61)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
-            .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
+            .frame(height: 82)
+            .clipShape(RoundedRectangle(cornerRadius: 42, style: .continuous))
+            .shadow(color: Color(red: 0.27, green: 0.62, blue: 0.74).opacity(0.55), radius: 13, x: 0, y: 0)
+            .contentShape(RoundedRectangle(cornerRadius: 42, style: .continuous))
         }
         .buttonStyle(.plain)
+        .padding(.horizontal, -10)
     }
 
     private var closetHeader: some View {
@@ -124,7 +135,11 @@ struct ProfileTab: View {
 
     private var outfitsSection: some View {
         LazyVGrid(columns: columns, spacing: 12) {
-            if filteredOutfits.isEmpty {
+            if isLoadingOutfits && outfitPhotos.isEmpty {
+                ForEach(0..<6, id: \.self) { _ in
+                    closetPlaceholderCard
+                }
+            } else if filteredOutfits.isEmpty {
                 ForEach(0..<6, id: \.self) { _ in
                     closetPlaceholderCard
                 }
@@ -148,7 +163,7 @@ struct ProfileTab: View {
                             } label: {
                                 Image(systemName: "ellipsis")
                                     .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.black)
+                                    .foregroundStyle(.white)
                                     .rotationEffect(.degrees(90))
                                     .frame(width: 34, height: 34)
                                     .contentShape(Rectangle())
@@ -220,5 +235,55 @@ struct ProfileTab: View {
 
             return true
         }
+    }
+
+    private func loadProfilePhoto() async {
+        do {
+            profilePhotoURL = try await service().fetchProfilePhotoURL(for: user.id)
+        } catch {
+            profilePhotoURL = nil
+        }
+    }
+
+    private func service() throws -> AuthServicing {
+        if let authService { return authService }
+        let createdService = try SupabaseAuthService()
+        authService = createdService
+        return createdService
+    }
+}
+
+private struct ClosetProfileAvatar: View {
+    let url: URL?
+
+    var body: some View {
+        Group {
+            if let url {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: 34, height: 34)
+        .clipShape(Circle())
+    }
+
+    private var placeholder: some View {
+        Circle()
+            .fill(Color.black.opacity(0.14))
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(Color.black.opacity(0.36))
+            }
     }
 }

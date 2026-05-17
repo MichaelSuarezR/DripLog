@@ -36,6 +36,7 @@ struct HomeView: View {
     @State private var outfitPhotos: [OutfitPhoto] = []
     @State private var outfitErrorMessage: String?
     @State private var didLoadOutfits = false
+    @State private var isLoadingOutfits = false
     @State private var outfitService: OutfitServicing?
     @State private var suggestionService: SuggestionServicing?
     @State private var isSuggestionsPresented = false
@@ -51,8 +52,11 @@ struct HomeView: View {
 
             CustomTabBar(selectedTab: $selectedTab)
         }
-        .task {
-            await loadOutfitsIfNeeded()
+        .onChange(of: selectedTab) { _, newTab in
+            guard newTab == .closet else { return }
+            Task {
+                await loadOutfitsIfNeeded()
+            }
         }
         .fullScreenCover(item: $pendingOutfitDraft) { draft in
             OutfitUploadTaggingView(
@@ -114,9 +118,20 @@ struct HomeView: View {
             ProfileTab(
                 user: user,
                 outfitPhotos: outfitPhotos,
+                isLoadingOutfits: isLoadingOutfits,
+                errorMessage: outfitErrorMessage,
                 onLogOut: onLogOut,
                 onEditOutfit: { editingOutfit = $0 },
-                onAskForSuggestions: prepareSuggestions
+                onAskForSuggestions: prepareSuggestions,
+                onProfileTapped: {
+                    isProfilePresented = true
+                },
+                onLoadOutfits: {
+                    await loadOutfitsIfNeeded()
+                },
+                onRefreshOutfits: {
+                    await loadOutfits(force: true)
+                }
             )
         case .add:
             CreateTab(
@@ -137,14 +152,38 @@ struct HomeView: View {
     // MARK: - Outfit Loading
 
     private func loadOutfitsIfNeeded() async {
-        guard !didLoadOutfits else { return }
-        didLoadOutfits = true
+        await loadOutfits(force: false)
+    }
+
+    private func loadOutfits(force: Bool) async {
+        guard (force || !didLoadOutfits), !isLoadingOutfits else { return }
+        isLoadingOutfits = true
+        outfitErrorMessage = nil
+        defer {
+            isLoadingOutfits = false
+        }
 
         do {
             outfitPhotos = try await service().fetchOutfits(for: user.id)
+            didLoadOutfits = true
+            Task {
+                await ImageCache.shared.prefetch(urls: outfitPhotos.map(\.imageURL))
+            }
+        } catch is CancellationError {
+            return
         } catch {
-            outfitErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not load saved outfits."
+            outfitErrorMessage = Self.outfitLoadMessage(for: error)
         }
+    }
+
+    private static func outfitLoadMessage(for error: Error) -> String {
+        let fallback = String(describing: error)
+        let description = (error as? LocalizedError)?.errorDescription
+        let details = [description, fallback]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty && $0 != "The operation couldn't be completed." }
+            ?? "Unknown error"
+        return "Could not load saved outfits: \(details)"
     }
 
     private func prepareOutfit(_ image: UIImage) {

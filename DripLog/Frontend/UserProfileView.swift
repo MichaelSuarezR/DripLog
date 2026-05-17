@@ -16,6 +16,7 @@ struct UserProfileView: View {
     @State private var profilePhotoErrorMessage: String?
     @State private var isLogoutConfirmationPresented = false
     @State private var isEditAccountPresented = false
+    @State private var isFriendsPresented = false
     @State private var authService: AuthServicing?
 
     private let backgroundColor = Color(hex: 0xF2EEE9)
@@ -48,7 +49,7 @@ struct UserProfileView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Back")
             .padding(.leading, 22)
-            .padding(.top, 36)
+            .padding(.top, 24)
         }
         .task {
             await loadProfilePhoto()
@@ -76,13 +77,18 @@ struct UserProfileView: View {
                 }
             )
         }
+        .fullScreenCover(isPresented: $isFriendsPresented) {
+            FriendsView(user: user) {
+                isFriendsPresented = false
+            }
+        }
     }
 
     private var titleArea: some View {
         Text("My Profile")
             .font(.system(size: 36, weight: .bold))
             .foregroundStyle(.black)
-            .padding(.top, 84)
+            .padding(.top, 68)
     }
 
     private var avatarArea: some View {
@@ -117,7 +123,9 @@ struct UserProfileView: View {
                 ProfileSettingsRow(icon: "person", title: "Account", accentBlue: accentBlue) {
                     isEditAccountPresented = true
                 }
-                ProfileSettingsRow(icon: "person.2", title: "Friends", accentBlue: accentBlue) {}
+                ProfileSettingsRow(icon: "person.2", title: "Friends", accentBlue: accentBlue) {
+                    isFriendsPresented = true
+                }
                 ProfileToggleRow(
                     icon: "bell",
                     title: "Notifications",

@@ -10,20 +10,15 @@ struct HomeTab: View {
     @State private var hasMore = true
     @State private var errorMessage: String?
     @State private var feedService: (any FeedServicing)?
+    @State private var profilePhotoURL: URL?
+    @State private var authService: AuthServicing?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
                     Button(action: onProfileTapped) {
-                        Circle()
-                            .fill(Color.black.opacity(0.12))
-                            .frame(width: 50, height: 50)
-                            .overlay {
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 24, weight: .regular))
-                                    .foregroundStyle(Color.black.opacity(0.38))
-                            }
+                        FeedProfileAvatar(url: profilePhotoURL)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open profile")
@@ -89,6 +84,26 @@ struct HomeTab: View {
             .navigationBarTitleDisplayMode(.inline)
             .task { await loadNextPage() }
         }
+        .onAppear {
+            Task {
+                await loadProfilePhoto()
+            }
+        }
+    }
+
+    private func loadProfilePhoto() async {
+        do {
+            profilePhotoURL = try await service().fetchProfilePhotoURL(for: user.id)
+        } catch {
+            profilePhotoURL = nil
+        }
+    }
+
+    private func service() throws -> AuthServicing {
+        if let authService { return authService }
+        let createdService = try SupabaseAuthService()
+        authService = createdService
+        return createdService
     }
 
     private func loadNextPage() async {
@@ -185,6 +200,41 @@ struct FeedPostCard: View {
 }
 
 // MARK: - FeedFilterChip
+
+private struct FeedProfileAvatar: View {
+    let url: URL?
+
+    var body: some View {
+        Group {
+            if let url {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: 50, height: 50)
+        .clipShape(Circle())
+    }
+
+    private var placeholder: some View {
+        Circle()
+            .fill(Color.black.opacity(0.12))
+            .overlay {
+                Image(systemName: "person.fill")
+                    .font(.system(size: 24, weight: .regular))
+                    .foregroundStyle(Color.black.opacity(0.38))
+            }
+    }
+}
 
 struct FeedFilterChip: View {
     let title: String

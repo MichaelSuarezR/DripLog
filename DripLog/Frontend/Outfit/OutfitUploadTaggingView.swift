@@ -396,8 +396,22 @@ struct OutfitUploadTaggingView: View {
             do {
                 try await onSave(metadata)
             } catch {
-                saveError = (error as? LocalizedError)?.errorDescription ?? "Could not save outfit photo."
+                saveError = Self.saveErrorMessage(for: error)
             }
         }
+    }
+
+    private static func saveErrorMessage(for error: Error) -> String {
+        let fallback = String(describing: error)
+        if fallback.contains("NSURLErrorDomain Code=-1001")
+            || fallback.localizedCaseInsensitiveContains("timed out") {
+            return "Could not save outfit photo: The upload timed out. Try again on a stronger connection."
+        }
+        let description = (error as? LocalizedError)?.errorDescription
+        let details = [description, fallback]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty && $0 != "The operation couldn't be completed." }
+            ?? "Unknown error"
+        return "Could not save outfit photo: \(details)"
     }
 }

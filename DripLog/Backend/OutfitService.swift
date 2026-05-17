@@ -145,40 +145,55 @@ struct SupabaseOutfitService: OutfitServicing {
             .order("created_at", ascending: false)
             .execute()
 
-        let photos: [OutfitPhoto] = try await withThrowingTaskGroup(of: OutfitPhoto?.self) { group in
-            for row in response.value {
+        guard !response.value.isEmpty else { return [] }
+
+        let signedURLs: [URL]
+        do {
+            signedURLs = try await client.storage
+                .from(bucketName)
+                .createSignedURLs(paths: response.value.map(\.imagePath), expiresIn: 3600)
+        } catch {
+            signedURLs = await createSignedURLsOneByOne(for: response.value.map(\.imagePath))
+        }
+
+        return zip(response.value, signedURLs).map { row, signedURL in
+            OutfitPhoto(
+                id: row.id,
+                imagePath: row.imagePath,
+                imageURL: signedURL,
+                tags: row.metadata.allTags,
+                customTags: row.metadata.customTags,
+                categories: row.metadata.categories,
+                weather: row.metadata.weather,
+                occasion: row.metadata.occasion,
+                colors: row.metadata.colors
+            )
+        }
+    }
+
+    private func createSignedURLsOneByOne(for imagePaths: [String]) async -> [URL] {
+        await withTaskGroup(of: (Int, URL).self) { group in
+            for (index, imagePath) in imagePaths.enumerated() {
                 group.addTask {
-                    let signedURL = try await self.client.storage
-                        .from(self.bucketName)
-                        .createSignedURL(path: row.imagePath, expiresIn: 3600)
-                    return OutfitPhoto(
-                        id: row.id,
-                        imagePath: row.imagePath,
-                        imageURL: signedURL,
-                        tags: row.metadata.allTags,
-                        customTags: row.metadata.customTags,
-                        categories: row.metadata.categories,
-                        weather: row.metadata.weather,
-                        occasion: row.metadata.occasion,
-                        colors: row.metadata.colors
-                    )
+                    if let signedURL = try? await client.storage
+                        .from(bucketName)
+                        .createSignedURL(path: imagePath, expiresIn: 3600) {
+                        return (index, signedURL)
+                    }
+
+                    let publicURL = (try? client.storage
+                        .from(bucketName)
+                        .getPublicURL(path: imagePath)) ?? URL(fileURLWithPath: imagePath)
+                    return (index, publicURL)
                 }
             }
 
-            var results: [OutfitPhoto] = []
-            for try await photo in group {
-                if let photo { results.append(photo) }
+            var orderedURLs = Array<URL?>(repeating: nil, count: imagePaths.count)
+            for await (index, signedURL) in group {
+                orderedURLs[index] = signedURL
             }
-            return results.sorted { a, b in
-                guard
-                    let ai = response.value.firstIndex(where: { $0.id == a.id }),
-                    let bi = response.value.firstIndex(where: { $0.id == b.id })
-                else { return false }
-                return ai < bi
-            }
+            return orderedURLs.compactMap { $0 }
         }
-
-        return photos
     }
 
     func uploadOutfit(_ image: UIImage, metadata: OutfitMetadata, for userID: UUID) async throws -> OutfitPhoto {
@@ -186,13 +201,7 @@ struct SupabaseOutfitService: OutfitServicing {
         let uploadPayload = try Self.makeUploadPayload(for: image, userID: userID, outfitID: outfitID)
         let normalizedMetadata = Self.normalizeMetadata(metadata)
 
-        try await client.storage
-            .from(bucketName)
-            .upload(
-                uploadPayload.path,
-                data: uploadPayload.data,
-                options: FileOptions(contentType: uploadPayload.contentType, upsert: false)
-            )
+        try await uploadPhoto(uploadPayload)
 
         let insert = OutfitInsert(
             id: outfitID,
@@ -209,9 +218,10 @@ struct SupabaseOutfitService: OutfitServicing {
             .insert(insert)
             .execute()
 
-        let signedURL = try await client.storage
+        let signedURL = (try? await client.storage
             .from(bucketName)
-            .createSignedURL(path: uploadPayload.path, expiresIn: 3600)
+            .createSignedURL(path: uploadPayload.path, expiresIn: 3600))
+            ?? ((try? client.storage.from(bucketName).getPublicURL(path: uploadPayload.path)) ?? URL(fileURLWithPath: uploadPayload.path))
 
         return OutfitPhoto(
             id: outfitID,
@@ -224,6 +234,45 @@ struct SupabaseOutfitService: OutfitServicing {
             occasion: normalizedMetadata.occasion,
             colors: normalizedMetadata.colors
         )
+    }
+
+    private func uploadPhoto(_ uploadPayload: UploadPayload) async throws {
+        var lastError: Error?
+
+        for attempt in 1...3 {
+            do {
+                try await client.storage
+                    .from(bucketName)
+                    .upload(
+                        uploadPayload.path,
+                        data: uploadPayload.data,
+                        options: FileOptions(contentType: uploadPayload.contentType, upsert: false)
+                    )
+                return
+            } catch {
+                lastError = error
+                guard Self.shouldRetryUpload(error), attempt < 3 else {
+                    throw error
+                }
+                try await Task.sleep(nanoseconds: UInt64(attempt) * 700_000_000)
+            }
+        }
+
+        if let lastError {
+            throw lastError
+        }
+    }
+
+    private static func shouldRetryUpload(_ error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            return urlError.code == .timedOut
+                || urlError.code == .networkConnectionLost
+                || urlError.code == .cannotConnectToHost
+        }
+
+        let description = String(describing: error)
+        return description.contains("NSURLErrorDomain Code=-1001")
+            || description.localizedCaseInsensitiveContains("timed out")
     }
 
     func updateOutfitMetadata(_ metadata: OutfitMetadata, for outfitID: UUID) async throws {
@@ -258,20 +307,9 @@ struct SupabaseOutfitService: OutfitServicing {
 
     private static func makeUploadPayload(for image: UIImage, userID: UUID, outfitID: UUID) throws -> UploadPayload {
         let basePath = "\(userID.uuidString.lowercased())/\(outfitID.uuidString.lowercased())"
+        let uploadImage = image.resizedForUpload(maxDimension: 900)
 
-        if
-            let cutoutImage = PersonCutoutProcessor.makeCutout(from: image),
-            let pngData = cutoutImage.pngData()
-        {
-            return UploadPayload(
-                path: "\(basePath).png",
-                data: pngData,
-                contentType: "image/png",
-                previewImage: cutoutImage
-            )
-        }
-
-        guard let imageData = image.jpegData(compressionQuality: 0.82) else {
+        guard let imageData = uploadImage.jpegData(compressionQuality: 0.58) else {
             throw OutfitError.missingImageData
         }
 
@@ -279,7 +317,7 @@ struct SupabaseOutfitService: OutfitServicing {
             path: "\(basePath).jpg",
             data: imageData,
             contentType: "image/jpeg",
-            previewImage: image
+            previewImage: uploadImage
         )
     }
 
@@ -681,6 +719,32 @@ private enum PersonCutoutProcessor {
 }
 
 private extension UIImage {
+    func resizedForUpload(maxDimension: CGFloat) -> UIImage {
+        let normalized = normalizedUpImage()
+        let longestSide = max(normalized.size.width, normalized.size.height)
+
+        guard longestSide > maxDimension else {
+            return normalized
+        }
+
+        let scaleFactor = maxDimension / longestSide
+        let targetSize = CGSize(
+            width: normalized.size.width * scaleFactor,
+            height: normalized.size.height * scaleFactor
+        )
+
+        let rendererFormat = UIGraphicsImageRendererFormat()
+        rendererFormat.scale = 1
+        rendererFormat.opaque = true
+
+        let renderer = UIGraphicsImageRenderer(size: targetSize, format: rendererFormat)
+        return renderer.image { _ in
+            UIColor.white.setFill()
+            UIRectFill(CGRect(origin: .zero, size: targetSize))
+            normalized.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
+
     func normalizedUpImage() -> UIImage {
         guard imageOrientation != .up else {
             return self
