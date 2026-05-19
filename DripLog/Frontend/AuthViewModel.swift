@@ -20,6 +20,7 @@ final class AuthViewModel: ObservableObject {
 
     @Published var mode: Mode = .signUp
     @Published var name = ""
+    @Published var username = ""
     @Published var email = ""
     @Published var password = ""
     @Published var confirmPassword = ""
@@ -75,7 +76,7 @@ final class AuthViewModel: ObservableObject {
                         throw AuthError.passwordMismatch
                     }
 
-                    currentUser = try await service().signUp(name: name, email: email, password: password)
+                    currentUser = try await service().signUp(name: name, username: username, email: email, password: password)
                     isNewUser = true
                 case .logIn:
                     currentUser = try await service().logIn(email: email, password: password)

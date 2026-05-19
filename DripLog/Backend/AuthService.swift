@@ -44,7 +44,7 @@ enum AuthError: LocalizedError, Equatable {
 
 protocol AuthServicing {
     func currentUser() async throws -> AppUser?
-    func signUp(name: String, email: String, password: String) async throws -> AppUser
+    func signUp(name: String, username: String, email: String, password: String) async throws -> AppUser
     func logIn(email: String, password: String) async throws -> AppUser
     func signInWithGoogle() async throws -> AppUser
     func updateAccount(userID: UUID, firstName: String, lastName: String, email: String) async throws -> AppUser
@@ -58,7 +58,7 @@ struct MissingConfigurationAuthService: AuthServicing {
         nil
     }
 
-    func signUp(name: String, email: String, password: String) async throws -> AppUser {
+    func signUp(name: String, username: String, email: String, password: String) async throws -> AppUser {
         throw AuthError.missingSupabaseConfiguration
     }
 
@@ -127,14 +127,25 @@ struct SupabaseAuthService: AuthServicing {
         return try await appUser(from: session.user)
     }
 
-    func signUp(name: String, email: String, password: String) async throws -> AppUser {
+    func signUp(name: String, username: String, email: String, password: String) async throws -> AppUser {
         try validateSignUp(name: name, email: email, password: password)
 
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let response = try await client.auth.signUp(
             email: email.normalizedEmail,
             password: password,
             data: ["name": .string(name.trimmingCharacters(in: .whitespacesAndNewlines))]
         )
+
+        let nameParts = name.trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: " ")
+        let profile = ProfileUpsertRow(
+            id: response.user.id,
+            firstName: nameParts.first ?? "",
+            lastName: nameParts.dropFirst().joined(separator: " "),
+            email: email.normalizedEmail,
+            username: trimmedUsername.isEmpty ? nil : trimmedUsername
+        )
+        try? await client.from("profiles").upsert(profile, onConflict: "id").execute()
 
         return try await appUser(from: response.user)
     }
@@ -182,7 +193,8 @@ struct SupabaseAuthService: AuthServicing {
             id: userID,
             firstName: trimmedFirstName,
             lastName: trimmedLastName,
-            email: normalizedEmail
+            email: normalizedEmail,
+            username: nil
         )
         try await client
             .from("profiles")
@@ -327,12 +339,14 @@ private struct ProfileUpsertRow: Encodable {
     let firstName: String
     let lastName: String
     let email: String
+    let username: String?
 
     enum CodingKeys: String, CodingKey {
         case id
         case firstName = "first_name"
         case lastName = "last_name"
         case email
+        case username
     }
 }
 

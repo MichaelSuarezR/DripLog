@@ -15,6 +15,7 @@ struct AuthView: View {
 
     @State private var firstName = ""
     @State private var lastName = ""
+    @State private var username = ""
 
     @FocusState private var focusedSignUpField: SignUpField?
     @FocusState private var focusedSignInField: SignInField?
@@ -27,7 +28,7 @@ struct AuthView: View {
     }
 
     private enum SignUpField: Hashable {
-        case firstName, lastName, email, password, confirm
+        case firstName, lastName, email, username, password, confirm
     }
 
     private enum SignInField: Hashable {
@@ -207,7 +208,8 @@ struct AuthView: View {
                     VStack(spacing: 14) {
                         fittyTextField(title: "First Name", text: $firstName, focused: $focusedSignUpField, equals: .firstName, submit: .lastName)
                         fittyTextField(title: "Last Name", text: $lastName, focused: $focusedSignUpField, equals: .lastName, submit: .email)
-                        fittyTextField(title: "Email Address", text: $viewModel.email, keyboard: .emailAddress, contentType: .emailAddress, focused: $focusedSignUpField, equals: .email, submit: .password)
+                        fittyTextField(title: "Email Address", text: $viewModel.email, keyboard: .emailAddress, contentType: .emailAddress, focused: $focusedSignUpField, equals: .email, submit: .username)
+                        fittyTextField(title: "Username", text: $username, focused: $focusedSignUpField, equals: .username, submit: .password)
                         fittySecureField(title: "Password", text: $viewModel.password, contentType: .newPassword, focused: $focusedSignUpField, equals: .password, submit: .confirm)
                         fittySecureField(title: "Re-enter Password", text: $viewModel.confirmPassword, contentType: .newPassword, focused: $focusedSignUpField, equals: .confirm, submit: nil)
                     }
@@ -359,6 +361,7 @@ struct AuthView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         viewModel.name = parts.joined(separator: " ")
+        viewModel.username = username
         viewModel.submit()
     }
 
