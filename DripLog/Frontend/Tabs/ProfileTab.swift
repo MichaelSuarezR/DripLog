@@ -54,7 +54,9 @@ struct ProfileTab: View {
             .toolbar(.hidden, for: .navigationBar)
             .fullScreenCover(isPresented: $isFilterPresented) {
                 ClosetFilterView(filters: $filters)
+                    .modalEntryTransition()
             }
+            .animation(AppAnimation.standardSpring, value: isFilterPresented)
         }
     }
 
@@ -90,26 +92,53 @@ struct ProfileTab: View {
             onAskForSuggestions()
         } label: {
             ZStack {
-                RoundedRectangle(cornerRadius: 42, style: .continuous)
-                    .fill(Color(red: 0.27, green: 0.62, blue: 0.74))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 42, style: .continuous)
-                            .stroke(Color(red: 0.46, green: 0.54, blue: 0.59), lineWidth: 4)
-                    }
+                FlowingInspirationBannerBackground(cornerRadius: 42)
 
-                Image("dkwtw")
-                    .resizable()
-                    .scaledToFill()
-                    .scaleEffect(1.08)
-                    .offset(x: -2.5, y: 0)
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.35), radius: 3, x: 0, y: 1)
+
+                    Text("don't know what to wear?")
+                        .font(AppFont.uiRegular(size: 15))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .shadow(color: .black.opacity(0.4), radius: 5, x: 0, y: 2)
+
+                    Image(systemName: "questionmark.circle.fill")
+                        .font(.system(size: 26, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
+                }
+                .padding(.horizontal, 22)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 82)
             .clipShape(RoundedRectangle(cornerRadius: 42, style: .continuous))
-            .shadow(color: Color(red: 0.27, green: 0.62, blue: 0.74).opacity(0.55), radius: 13, x: 0, y: 0)
+            .overlay {
+                RoundedRectangle(cornerRadius: 42, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                .white.opacity(0.45),
+                                .white.opacity(0.12),
+                                AppColor.loadingBlue.opacity(0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .shadow(color: AppColor.loadingBlue.opacity(0.4), radius: 18, x: 0, y: 8)
+            .shadow(color: AppColor.lavender.opacity(0.28), radius: 28, x: 0, y: 0)
+            .shadow(color: AppColor.accentOrange.opacity(0.15), radius: 20, x: 0, y: 0)
             .contentShape(RoundedRectangle(cornerRadius: 42, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(InspirationBannerButtonStyle())
         .padding(.horizontal, -10)
     }
 
@@ -250,6 +279,15 @@ struct ProfileTab: View {
         let createdService = try SupabaseAuthService()
         authService = createdService
         return createdService
+    }
+}
+
+private struct InspirationBannerButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(AppAnimation.standardSpring, value: configuration.isPressed)
+            .opacity(configuration.isPressed ? 0.96 : 1)
     }
 }
 

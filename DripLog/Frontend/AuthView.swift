@@ -501,11 +501,11 @@ struct AuthView: View {
 // MARK: - Design tokens
 
 private enum FittyColor {
-    static let loadingBackground = Color(hex: 0x4597B7)
-    static let cream = Color(hex: 0xF2EEE9)
+    static let loadingBackground = AppColor.loadingBlue
+    static let cream = AppColor.cream
     static let cardWhite = Color(hex: 0xFBFBFA)
-    static let accentOrange = Color(hex: 0xD94A2F)
-    static let linkBlue = Color(hex: 0x4597B7)
+    static let accentOrange = AppColor.accentOrange
+    static let linkBlue = AppColor.loadingBlue
 }
 
 private enum FittyFont {
@@ -543,18 +543,6 @@ private enum FittyFont {
             return base
         }
         return nil
-    }
-}
-
-private extension Color {
-    init(hex: UInt32, alpha: Double = 1) {
-        self.init(
-            .sRGB,
-            red: Double((hex >> 16) & 0xFF) / 255,
-            green: Double((hex >> 8) & 0xFF) / 255,
-            blue: Double(hex & 0xFF) / 255,
-            opacity: alpha
-        )
     }
 }
 

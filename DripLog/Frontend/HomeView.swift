@@ -71,6 +71,7 @@ struct HomeView: View {
                     selectedTab = .closet
                 }
             )
+            .modalEntryTransition()
         }
         .fullScreenCover(item: $editingOutfit) { photo in
             OutfitEditView(
@@ -82,6 +83,7 @@ struct HomeView: View {
                     await deleteOutfit(photo)
                 }
             )
+            .modalEntryTransition()
         }
         .fullScreenCover(isPresented: $isSuggestionsPresented) {
             SuggestionsView(
