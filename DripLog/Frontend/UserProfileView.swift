@@ -144,10 +144,23 @@ struct UserProfileView: View {
             }
 
             ProfileSettingsSection(title: "Feedback", accentBlue: accentBlue) {
-                ProfileSettingsRow(icon: "ladybug", title: "Report a bug", accentBlue: accentBlue) {}
-                ProfileSettingsRow(icon: "megaphone", title: "Feedback", accentBlue: accentBlue) {}
+                ProfileSettingsRow(icon: "ladybug", title: "Report a bug", accentBlue: accentBlue) {
+                    openMail(subject: "Bug Report", body: "Describe the bug here...")
+                }
+                ProfileSettingsRow(icon: "megaphone", title: "Feedback", accentBlue: accentBlue) {
+                    openMail(subject: "Feedback", body: "Share your feedback here...")
+                }
             }
             .padding(.top, 41)
+        }
+    }
+
+    private func openMail(subject: String, body: String) {
+        let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject
+        let encodedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? body
+        let urlString = "mailto:driplog26@gmail.com?subject=\(encodedSubject)&body=\(encodedBody)"
+        if let url = URL(string: urlString) {
+            UIApplication.shared.open(url)
         }
     }
 
