@@ -11,11 +11,12 @@ struct FriendsView: View {
     @State private var searchResults: [FriendSearchResult] = []
     @State private var sentRequestIDs: Set<UUID> = []
     @State private var selectedProfile: FriendSearchResult?
+    @State private var profileToUnfollow: FriendProfile?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var friendService: FriendServicing?
 
-    private let backgroundColor = Color(hex: 0xF2EEE9)
+    private let backgroundColor = Color.white
     private let activeColor = Color(hex: 0xE4432D)
     private let actionBlue = Color(hex: 0x43A3C7)
     private let borderColor = Color.black.opacity(0.18)
@@ -88,6 +89,27 @@ struct FriendsView: View {
                 }
             )
         }
+        .confirmationDialog(
+            "Are you sure you'd like to unfollow?",
+            isPresented: Binding(
+                get: { profileToUnfollow != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        profileToUnfollow = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Unfollow", role: .destructive) {
+                if let profileToUnfollow {
+                    Task { await unfollow(profileToUnfollow) }
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                profileToUnfollow = nil
+            }
+        }
     }
 
     private var topSpacer: some View {
@@ -157,18 +179,30 @@ struct FriendsView: View {
                 switch selectedTab {
                 case .friends:
                     ForEach(friends) { friend in
-                        FriendNameRow(profile: friend)
+                        FriendNameRow(
+                            profile: friend,
+                            actionBlue: actionBlue,
+                            onProfileTap: {
+                                selectedProfile = FriendSearchResult(profile: friend, hasSentRequest: true)
+                            },
+                            onUnfollow: {
+                                profileToUnfollow = friend
+                            }
+                        )
                     }
                 case .friendRequests:
                     ForEach(incomingRequests) { request in
                         FriendRequestRow(
                             request: request,
                             actionBlue: actionBlue,
-                            onAccept: {
-                                Task { await accept(request) }
+                            onProfileTap: {
+                                selectedProfile = FriendSearchResult(
+                                    profile: request.user,
+                                    hasSentRequest: request.isFollowingBack || sentRequestIDs.contains(request.user.id)
+                                )
                             },
-                            onDecline: {
-                                Task { await decline(request) }
+                            onFollowBack: {
+                                Task { await followBack(request) }
                             }
                         )
                     }
@@ -221,7 +255,7 @@ struct FriendsView: View {
         do {
             searchResults = try await service().searchUsers(matching: searchText, currentUserID: user.id)
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not search friends."
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not search accounts."
         }
     }
 
@@ -236,17 +270,38 @@ struct FriendsView: View {
                 return FriendSearchResult(profile: result.profile, hasSentRequest: true)
             }
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not send friend request."
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not follow this account."
         }
     }
 
-    private func accept(_ request: FriendRequest) async {
+    private func followBack(_ request: FriendRequest) async {
+        guard !request.isFollowingBack else { return }
+
         do {
-            try await service().acceptFriendRequest(request.id)
-            incomingRequests.removeAll { $0.id == request.id }
+            try await service().acceptFriendRequest(from: request.user.id, to: user.id)
+            incomingRequests = incomingRequests.map { existing in
+                guard existing.id == request.id else { return existing }
+                return FriendRequest(id: existing.id, user: existing.user, isFollowingBack: true)
+            }
             await loadFriends()
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not accept friend request."
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not follow back."
+        }
+    }
+
+    private func unfollow(_ profile: FriendProfile) async {
+        profileToUnfollow = nil
+
+        do {
+            try await service().unfollow(from: user.id, to: profile.id)
+            friends.removeAll { $0.id == profile.id }
+            sentRequestIDs.remove(profile.id)
+            searchResults = searchResults.map { result in
+                guard result.profile.id == profile.id else { return result }
+                return FriendSearchResult(profile: result.profile, hasSentRequest: false)
+            }
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not unfollow this account."
         }
     }
 
@@ -289,9 +344,9 @@ private enum FriendsTab: CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .friends:
-            "Friends"
+            "Following"
         case .friendRequests:
-            "Friend\nRequests"
+            "Followers"
         case .findFriends:
             "Find\nFriends"
         }
@@ -300,14 +355,30 @@ private enum FriendsTab: CaseIterable, Identifiable {
 
 private struct FriendNameRow: View {
     let profile: FriendProfile
+    let actionBlue: Color
+    let onProfileTap: () -> Void
+    let onUnfollow: () -> Void
 
     var body: some View {
-        HStack(spacing: 17) {
-            FriendAvatar(url: profile.avatarURL)
-            Text(profile.name)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.black)
-            Spacer()
+        HStack(spacing: 14) {
+            Button(action: onProfileTap) {
+                HStack(spacing: 17) {
+                    FriendAvatar(url: profile.avatarURL)
+                    Text(profile.name)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.black)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button("Unfollow", action: onUnfollow)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 85, height: 39)
+                .background(actionBlue, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .buttonStyle(.plain)
         }
         .frame(height: 65)
     }
@@ -316,32 +387,32 @@ private struct FriendNameRow: View {
 private struct FriendRequestRow: View {
     let request: FriendRequest
     let actionBlue: Color
-    let onAccept: () -> Void
-    let onDecline: () -> Void
+    let onProfileTap: () -> Void
+    let onFollowBack: () -> Void
 
     var body: some View {
         HStack(spacing: 16) {
-            FriendAvatar(url: request.user.avatarURL)
+            Button(action: onProfileTap) {
+                HStack(spacing: 16) {
+                    FriendAvatar(url: request.user.avatarURL)
 
-            Text(request.user.name)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.black)
+                    Text(request.user.name)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.black)
 
-            Spacer()
-
-            Button("Accept", action: onAccept)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 77, height: 41)
-                .background(actionBlue, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-
-            Button(action: onDecline) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 25, weight: .regular))
-                    .foregroundStyle(.black)
-                    .frame(width: 31, height: 41)
+                    Spacer()
+                }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            Button(request.isFollowingBack ? "Following" : "Follow Back", action: onFollowBack)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 100, height: 39)
+                .background(request.isFollowingBack ? Color(hex: 0x9BB3E1) : actionBlue, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .disabled(request.isFollowingBack)
+                .buttonStyle(.plain)
         }
         .frame(height: 65)
     }
@@ -370,7 +441,7 @@ private struct FindFriendRow: View {
             }
             .buttonStyle(.plain)
 
-            Button(isSent ? "Added" : "Add", action: onAdd)
+            Button(isSent ? "Following" : "Follow", action: onAdd)
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 85, height: 39)
@@ -382,7 +453,7 @@ private struct FindFriendRow: View {
     }
 }
 
-private struct FriendProfileDetailView: View {
+struct FriendProfileDetailView: View {
     let profile: FriendProfile
     let isSent: Bool
     let onBack: () -> Void
@@ -452,7 +523,7 @@ private struct FriendProfileDetailView: View {
             Button {
                 Task { await follow() }
             } label: {
-                Text((isSent || didSendFollow) ? "Sent" : "Follow")
+                Text((isSent || didSendFollow) ? "Following" : "Follow")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 218, height: 45)

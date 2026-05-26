@@ -19,7 +19,7 @@ struct UserProfileView: View {
     @State private var isFriendsPresented = false
     @State private var authService: AuthServicing?
 
-    private let backgroundColor = Color(hex: 0xF2EEE9)
+    private let backgroundColor = Color.white
     private let accentBlue = Color(hex: 0x3AA4CC)
     private let toggleBlue = Color(hex: 0x9BB3E1)
     private var notificationsStorageKey: String { "profileNotifications.\(user.id.uuidString)" }

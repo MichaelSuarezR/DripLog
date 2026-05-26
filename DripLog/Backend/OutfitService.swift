@@ -211,7 +211,8 @@ struct SupabaseOutfitService: OutfitServicing {
             categories: normalizedMetadata.categories,
             weather: normalizedMetadata.weather,
             occasion: normalizedMetadata.occasion,
-            colors: normalizedMetadata.colors
+            colors: normalizedMetadata.colors,
+            visibility: OutfitVisibility.publicProfile.title
         )
         try await client
             .from("outfits")
@@ -643,6 +644,7 @@ private struct OutfitInsert: Encodable {
     let weather: [String]
     let occasion: [String]
     let colors: [String]
+    let visibility: String
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -653,6 +655,7 @@ private struct OutfitInsert: Encodable {
         case weather
         case occasion
         case colors
+        case visibility
     }
 }
 

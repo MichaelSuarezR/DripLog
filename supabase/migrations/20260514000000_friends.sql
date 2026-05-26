@@ -8,11 +8,8 @@ create table if not exists public.friendships (
   constraint friendships_no_self_request check (requester_id <> addressee_id)
 );
 
-create unique index if not exists friendships_unique_pair
-on public.friendships (
-  least(requester_id, addressee_id),
-  greatest(requester_id, addressee_id)
-);
+create unique index if not exists friendships_unique_directional
+on public.friendships (requester_id, addressee_id);
 
 alter table public.friendships enable row level security;
 
@@ -21,6 +18,7 @@ drop policy if exists "Authenticated users can read profile photos" on storage.o
 drop policy if exists "Users can read their friendships" on public.friendships;
 drop policy if exists "Users can send friend requests" on public.friendships;
 drop policy if exists "Users can accept requests sent to them" on public.friendships;
+drop policy if exists "Users can follow accounts" on public.friendships;
 drop policy if exists "Users can delete their friendships" on public.friendships;
 
 create policy "Authenticated users can read profiles"
@@ -41,22 +39,15 @@ for select
 to authenticated
 using (requester_id = auth.uid() or addressee_id = auth.uid());
 
-create policy "Users can send friend requests"
+create policy "Users can follow accounts"
 on public.friendships
 for insert
 to authenticated
 with check (
   requester_id = auth.uid()
-  and status = 'pending'
+  and status = 'accepted'
   and requester_id <> addressee_id
 );
-
-create policy "Users can accept requests sent to them"
-on public.friendships
-for update
-to authenticated
-using (addressee_id = auth.uid())
-with check (addressee_id = auth.uid());
 
 create policy "Users can delete their friendships"
 on public.friendships

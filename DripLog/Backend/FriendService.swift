@@ -11,6 +11,7 @@ struct FriendProfile: Identifiable, Equatable {
 struct FriendRequest: Identifiable, Equatable {
     let id: UUID
     let user: FriendProfile
+    let isFollowingBack: Bool
 }
 
 struct FriendSearchResult: Identifiable, Equatable {
@@ -25,7 +26,8 @@ protocol FriendServicing {
     func fetchIncomingRequests(for userID: UUID) async throws -> [FriendRequest]
     func searchUsers(matching query: String, currentUserID: UUID) async throws -> [FriendSearchResult]
     func sendFriendRequest(from requesterID: UUID, to addresseeID: UUID) async throws
-    func acceptFriendRequest(_ requestID: UUID) async throws
+    func acceptFriendRequest(from requesterID: UUID, to addresseeID: UUID) async throws
+    func unfollow(from requesterID: UUID, to addresseeID: UUID) async throws
     func declineFriendRequest(_ requestID: UUID) async throws
 }
 
@@ -41,24 +43,27 @@ struct SupabaseFriendService: FriendServicing {
         let response: PostgrestResponse<[FriendshipRow]> = try await client
             .from("friendships")
             .select("id,requester_id,addressee_id,status,created_at")
+            .eq("requester_id", value: userID)
             .eq("status", value: FriendshipStatus.accepted.rawValue)
-            .or("requester_id.eq.\(userID.uuidString),addressee_id.eq.\(userID.uuidString)")
             .order("created_at", ascending: false)
             .execute()
 
-        let friendIDs = response.value.map { row in
-            row.requesterID == userID ? row.addresseeID : row.requesterID
-        }
+        let friendIDs = response.value.map(\.addresseeID)
 
         return try await fetchProfiles(ids: friendIDs)
     }
 
     func fetchIncomingRequests(for userID: UUID) async throws -> [FriendRequest] {
+        let allFriendships = try await fetchFriendshipsInvolving(userID: userID)
+        let followingIDs = Set(allFriendships.filter {
+            $0.requesterID == userID && $0.status == FriendshipStatus.accepted.rawValue
+        }.map(\.addresseeID))
+
         let response: PostgrestResponse<[FriendshipRow]> = try await client
             .from("friendships")
             .select("id,requester_id,addressee_id,status,created_at")
             .eq("addressee_id", value: userID)
-            .eq("status", value: FriendshipStatus.pending.rawValue)
+            .eq("status", value: FriendshipStatus.accepted.rawValue)
             .order("created_at", ascending: false)
             .execute()
 
@@ -68,22 +73,16 @@ struct SupabaseFriendService: FriendServicing {
 
         return response.value.compactMap { row in
             guard let profile = profilesByID[row.requesterID] else { return nil }
-            return FriendRequest(id: row.id, user: profile)
+            return FriendRequest(id: row.id, user: profile, isFollowingBack: followingIDs.contains(row.requesterID))
         }
     }
 
     func searchUsers(matching query: String, currentUserID: UUID) async throws -> [FriendSearchResult] {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let friendships = try await fetchFriendshipsInvolving(userID: currentUserID)
-        let acceptedIDs = Set(friendships.filter { $0.status == FriendshipStatus.accepted.rawValue }.map { row in
-            row.requesterID == currentUserID ? row.addresseeID : row.requesterID
-        })
-        let sentPendingIDs = Set(friendships.filter {
-            $0.status == FriendshipStatus.pending.rawValue && $0.requesterID == currentUserID
+        let followingIDs = Set(friendships.filter {
+            $0.status == FriendshipStatus.accepted.rawValue && $0.requesterID == currentUserID
         }.map(\.addresseeID))
-        let incomingPendingIDs = Set(friendships.filter {
-            $0.status == FriendshipStatus.pending.rawValue && $0.addresseeID == currentUserID
-        }.map(\.requesterID))
 
         let response: PostgrestResponse<[ProfileFriendRow]> = try await client
             .from("profiles")
@@ -93,7 +92,7 @@ struct SupabaseFriendService: FriendServicing {
             .execute()
 
         return try await withThrowingTaskGroup(of: FriendSearchResult?.self) { group in
-            for row in response.value where !acceptedIDs.contains(row.id) && !incomingPendingIDs.contains(row.id) {
+            for row in response.value {
                 guard normalizedQuery.isEmpty || row.searchText.contains(normalizedQuery) else {
                     continue
                 }
@@ -102,7 +101,7 @@ struct SupabaseFriendService: FriendServicing {
                     let profile = try await makeFriendProfile(from: row)
                     return FriendSearchResult(
                         profile: profile,
-                        hasSentRequest: sentPendingIDs.contains(row.id)
+                        hasSentRequest: followingIDs.contains(row.id)
                     )
                 }
             }
@@ -120,7 +119,7 @@ struct SupabaseFriendService: FriendServicing {
         let insert = FriendshipInsert(
             requesterID: requesterID,
             addresseeID: addresseeID,
-            status: FriendshipStatus.pending.rawValue
+            status: FriendshipStatus.accepted.rawValue
         )
 
         try await client
@@ -129,11 +128,23 @@ struct SupabaseFriendService: FriendServicing {
             .execute()
     }
 
-    func acceptFriendRequest(_ requestID: UUID) async throws {
+    func acceptFriendRequest(from requesterID: UUID, to addresseeID: UUID) async throws {
         try await client
             .from("friendships")
-            .update(FriendshipStatusUpdate(status: FriendshipStatus.accepted.rawValue))
-            .eq("id", value: requestID)
+            .insert(FriendshipInsert(
+                requesterID: addresseeID,
+                addresseeID: requesterID,
+                status: FriendshipStatus.accepted.rawValue
+            ))
+            .execute()
+    }
+
+    func unfollow(from requesterID: UUID, to addresseeID: UUID) async throws {
+        try await client
+            .from("friendships")
+            .delete()
+            .eq("requester_id", value: requesterID)
+            .eq("addressee_id", value: addresseeID)
             .execute()
     }
 

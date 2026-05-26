@@ -13,7 +13,7 @@ struct EditAccountView: View {
     @State private var errorMessage: String?
     @State private var authService: AuthServicing?
 
-    private let backgroundColor = Color(hex: 0xF2EEE9)
+    private let backgroundColor = Color.white
 
     init(user: AppUser, onUserUpdated: @escaping (AppUser) -> Void, onClose: @escaping () -> Void) {
         self.user = user
