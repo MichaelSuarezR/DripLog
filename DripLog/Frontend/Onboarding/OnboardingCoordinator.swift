@@ -9,12 +9,15 @@ struct OnboardingCoordinator: View {
 
     private enum Step: Equatable {
         case intro
+        case preferences
         case photoGrid
         case tagging(slotID: String)
     }
 
     @State private var step: Step = .intro
     @State private var introPageIndex = 0
+    @State private var selectedGender: String = ""
+    @State private var selectedStyle: String = ""
     @State private var profileSlot = OnboardingSlotState(kind: .profile)
     @State private var outfitSlots: [OnboardingSlotState] = (0..<5).map { OnboardingSlotState(kind: .outfit($0)) }
     @State private var isFinishing = false
@@ -43,8 +46,17 @@ struct OnboardingCoordinator: View {
             case .intro:
                 OnboardingView(pageIndex: $introPageIndex) {
                     withAnimation(AppAnimation.standardSpring) {
-                        step = .photoGrid
+                        step = .preferences
                     }
+                }
+                .transition(wizardTransition)
+
+            case .preferences:
+                OnboardingPreferencesView(
+                    selectedGender: $selectedGender,
+                    selectedStyle: $selectedStyle
+                ) {
+                    Task { await savePreferencesAndContinue() }
                 }
                 .transition(wizardTransition)
 
@@ -232,6 +244,13 @@ struct OnboardingCoordinator: View {
             withAnimation(AppAnimation.standardSpring) {
                 step = .photoGrid
             }
+        }
+    }
+
+    private func savePreferencesAndContinue() async {
+        try? await auth().savePreferences(userID: user.id, gender: selectedGender, style: selectedStyle)
+        withAnimation(AppAnimation.standardSpring) {
+            step = .photoGrid
         }
     }
 

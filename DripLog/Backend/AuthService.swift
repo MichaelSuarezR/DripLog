@@ -50,6 +50,7 @@ protocol AuthServicing {
     func updateAccount(userID: UUID, firstName: String, lastName: String, email: String) async throws -> AppUser
     func fetchProfilePhotoURL(for userID: UUID) async throws -> URL?
     func updateProfilePhoto(_ image: UIImage, for userID: UUID) async throws -> URL
+    func savePreferences(userID: UUID, gender: String, style: String) async throws
     func logOut() async throws
 }
 
@@ -79,6 +80,10 @@ struct MissingConfigurationAuthService: AuthServicing {
     }
 
     func updateProfilePhoto(_ image: UIImage, for userID: UUID) async throws -> URL {
+        throw AuthError.missingSupabaseConfiguration
+    }
+
+    func savePreferences(userID: UUID, gender: String, style: String) async throws {
         throw AuthError.missingSupabaseConfiguration
     }
 
@@ -263,6 +268,18 @@ struct SupabaseAuthService: AuthServicing {
 
     func logOut() async throws {
         try await client.auth.signOut()
+    }
+
+    func savePreferences(userID: UUID, gender: String, style: String) async throws {
+        struct PreferencesUpdate: Encodable {
+            let gender: String
+            let style: String
+        }
+        try await client
+            .from("profiles")
+            .update(PreferencesUpdate(gender: gender, style: style))
+            .eq("id", value: userID)
+            .execute()
     }
 
     private func appUser(from user: User) async throws -> AppUser {
