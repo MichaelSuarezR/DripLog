@@ -91,55 +91,23 @@ struct ProfileTab: View {
         Button {
             onAskForSuggestions()
         } label: {
-            ZStack {
-                FlowingInspirationBannerBackground(cornerRadius: 42)
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .semibold))
 
-                HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.35), radius: 3, x: 0, y: 1)
-
-                    Text("don't know what to wear?")
-                        .font(AppFont.uiRegular(size: 15))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.85)
-                        .shadow(color: .black.opacity(0.4), radius: 5, x: 0, y: 2)
-
-                    Image(systemName: "questionmark.circle.fill")
-                        .font(.system(size: 26, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.95))
-                        .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
-                }
-                .padding(.horizontal, 22)
+                Text("Generate Outfit")
+                    .font(AppFont.uiBold(size: 16))
             }
+            .foregroundStyle(.black)
             .frame(maxWidth: .infinity)
-            .frame(height: 82)
-            .clipShape(RoundedRectangle(cornerRadius: 42, style: .continuous))
+            .frame(height: 48)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 42, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                .white.opacity(0.45),
-                                .white.opacity(0.12),
-                                AppColor.loadingBlue.opacity(0.2)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
+                AIRainbowBorderView(cornerRadius: 14, lineWidth: 2.5)
             }
-            .shadow(color: AppColor.loadingBlue.opacity(0.4), radius: 18, x: 0, y: 8)
-            .shadow(color: AppColor.lavender.opacity(0.28), radius: 28, x: 0, y: 0)
-            .shadow(color: AppColor.accentOrange.opacity(0.15), radius: 20, x: 0, y: 0)
-            .contentShape(RoundedRectangle(cornerRadius: 42, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(InspirationBannerButtonStyle())
-        .padding(.horizontal, -10)
     }
 
     private var closetHeader: some View {
