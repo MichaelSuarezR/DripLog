@@ -41,12 +41,12 @@ struct TagEditorConfiguration {
         mode: .outfitUpload,
         title: "Outfit Upload",
         showsRating: false,
-        showsVisibility: false,
+        showsVisibility: true,
         showsPromptRow: true,
         showsAISection: true,
-        showsCustomSuggestions: true,
-        showsNotes: false,
-        showsAdditionalImages: false,
+        showsCustomSuggestions: false,
+        showsNotes: true,
+        showsAdditionalImages: true,
         showsFooterActions: false,
         autoTagOnAppear: true
     )
@@ -101,6 +101,8 @@ struct TagEditorView: View {
     @State private var autoTagError: String?
     @State private var notes = ""
     @State private var aiSuggestedChips: [String] = []
+    @State private var isCustomTagPromptPresented = false
+    @State private var customTagDraft = ""
 
     private let uploadSuggestedTags = [
         "Black Top", "Dark Blue Jeans", "Red Scarf", "Flared Leggings",
@@ -129,7 +131,9 @@ struct TagEditorView: View {
                     aiSuggestedSection
                 }
 
-                tagChips
+                if configuration.mode != .outfitUpload {
+                    tagChips
+                }
 
                 metadataSections
 
@@ -143,6 +147,10 @@ struct TagEditorView: View {
 
                 if configuration.showsNotes {
                     notesSection
+                }
+
+                if configuration.showsVisibility, configuration.mode == .outfitUpload, let visibility {
+                    visibilitySection(visibility)
                 }
 
                 if let footer {
@@ -236,7 +244,7 @@ struct TagEditorView: View {
         HStack(alignment: .top, spacing: 16) {
             TextField("What are you wearing?", text: promptBinding)
                 .font(AppFont.uiRegular(size: 16))
-                .textInputAutocapitalization(.words)
+                .textInputAutocapitalization(.sentences)
                 .autocorrectionDisabled()
                 .submitLabel(.done)
                 .onSubmit { addCustomTag(promptBinding.wrappedValue) }
@@ -277,7 +285,7 @@ struct TagEditorView: View {
                 }
 
                 ForEach(aiSuggestedChips.prefix(3), id: \.self) { chip in
-                    aiChipButton(chip)
+                    aiChip(label: chip)
                 }
             }
         }
@@ -285,27 +293,22 @@ struct TagEditorView: View {
         .tutorialAnchor(step: .aiTags)
     }
 
-    private func aiChipButton(_ label: String) -> some View {
-        Button {
-            addCustomTag(label)
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "sparkles")
-                    .font(.caption2)
-                    .foregroundStyle(AppColor.aiChipTint)
-                Text(label)
-                    .font(AppFont.uiRegular(size: 12))
-                    .foregroundStyle(AppColor.aiChipTint)
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 24)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(AppColor.loadingBlue, lineWidth: 2)
-            )
+    private func aiChip(label: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "sparkles")
+                .font(.caption2)
+                .foregroundStyle(AppColor.aiChipTint)
+            Text(label)
+                .font(AppFont.uiRegular(size: 12))
+                .foregroundStyle(AppColor.aiChipTint)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .frame(height: 24)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(AppColor.loadingBlue, lineWidth: 2)
+        )
     }
 
     // MARK: - Tag chips
@@ -353,13 +356,15 @@ struct TagEditorView: View {
                 categoriesContent
             }
 
-            section(.weather, title: "Weather", placeholder: "Choose the weather") {
-                TagChipGrid(
-                    items: ClosetFilters.weatherOptions,
-                    selected: $filters.weather,
-                    showsClearButton: configuration.mode == .filter,
-                    onClear: { filters.weather.removeAll() }
-                )
+            if configuration.mode != .outfitUpload {
+                section(.weather, title: "Weather", placeholder: "Choose the weather") {
+                    TagChipGrid(
+                        items: ClosetFilters.weatherOptions,
+                        selected: $filters.weather,
+                        showsClearButton: configuration.mode == .filter,
+                        onClear: { filters.weather.removeAll() }
+                    )
+                }
             }
 
             section(.occasion, title: "Occasion", placeholder: "Choose the occassion") {
@@ -372,34 +377,46 @@ struct TagEditorView: View {
             }
 
             section(.colors, title: "Colors", placeholder: "Choose the colors") {
-                TagChipGrid(
-                    items: ClosetFilters.colorOptions,
-                    selected: $filters.colors,
-                    showsClearButton: configuration.mode == .filter,
-                    onClear: { filters.colors.removeAll() }
-                )
+                if configuration.mode == .outfitUpload {
+                    uploadColorPicker
+                } else {
+                    TagChipGrid(
+                        items: ClosetFilters.colorOptions,
+                        selected: $filters.colors,
+                        showsClearButton: configuration.mode == .filter,
+                        onClear: { filters.colors.removeAll() }
+                    )
+                }
             }
 
             section(.custom, title: "Custom", placeholder: "Choose your custom tags") {
-                TagChipGrid(
-                    items: filters.customSuggestions,
-                    selected: $filters.custom,
-                    showsClearButton: configuration.mode == .filter,
-                    onClear: { filters.custom.removeAll() }
-                )
-            }
-
-            if configuration.showsVisibility, let visibility {
-                section(.visibility, title: "Visibility", placeholder: "Choose your visibility") {
+                if configuration.mode == .outfitUpload {
+                    customTagAddButton
+                } else {
                     TagChipGrid(
-                        items: OutfitVisibility.allCases.map(\.title),
-                        selected: visibilityBinding(visibility)
+                        items: filters.customSuggestions,
+                        selected: $filters.custom,
+                        showsClearButton: configuration.mode == .filter,
+                        onClear: { filters.custom.removeAll() }
                     )
                 }
+            }
+
+            if configuration.showsVisibility, configuration.mode != .outfitUpload, let visibility {
+                visibilitySection(visibility)
             }
         }
         .padding(.top, configuration.showsPromptRow ? 12 : 0)
         .tutorialAnchor(step: .dropdowns)
+    }
+
+    private func visibilitySection(_ visibility: Binding<OutfitVisibility>) -> some View {
+        section(.visibility, title: "Visibility", placeholder: "Choose your visibility") {
+            TagChipGrid(
+                items: OutfitVisibility.allCases.map(\.title),
+                selected: visibilityBinding(visibility)
+            )
+        }
     }
 
     private var categoryTitle: String {
@@ -414,9 +431,10 @@ struct TagEditorView: View {
     private var categoriesContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             ForEach(ClosetCategoryGroup.allCases) { group in
+                let groupSelection = binding(for: group)
                 VStack(alignment: .leading, spacing: 10) {
-                    TagCategoryGroupChip(title: group.title)
-                    TagChipGrid(items: group.items, selected: binding(for: group))
+                    TagCategoryGroupChip(title: group.title, isSelected: !groupSelection.wrappedValue.isEmpty)
+                    TagChipGrid(items: group.items, selected: groupSelection)
                 }
             }
 
@@ -429,6 +447,90 @@ struct TagEditorView: View {
                     .background(Color.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                     .buttonStyle(.plain)
             }
+        }
+    }
+
+    private var uploadColorPicker: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 32, maximum: 36), spacing: 14)],
+            alignment: .leading,
+            spacing: 12
+        ) {
+            ForEach(ClosetFilters.colorOptions, id: \.self) { colorName in
+                Button {
+                    if filters.colors.contains(colorName) {
+                        filters.colors.remove(colorName)
+                    } else {
+                        filters.colors.insert(colorName)
+                    }
+                } label: {
+                    colorCircle(for: colorName, isSelected: filters.colors.contains(colorName))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func colorCircle(for colorName: String, isSelected: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(swiftUIColor(for: colorName))
+                .frame(width: 26, height: 26)
+                .overlay {
+                    Circle()
+                        .stroke(colorName == "white" ? Color.black.opacity(0.22) : Color.clear, lineWidth: 1)
+                }
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(colorName == "white" || colorName == "yellow" || colorName == "tan" ? .black : .white)
+            }
+        }
+        .overlay {
+            if isSelected {
+                Circle()
+                    .stroke(AppColor.placeholderBlue, lineWidth: 2)
+                    .frame(width: 32, height: 32)
+            }
+        }
+        .frame(width: 32, height: 32)
+    }
+
+    private func swiftUIColor(for colorName: String) -> Color {
+        switch colorName {
+        case "black":  return .black
+        case "white":  return .white
+        case "gray":   return Color(hex: 0xB9B9B9)
+        case "brown":  return Color(hex: 0x7A450C)
+        case "blue":   return Color(hex: 0x8DBBDD)
+        case "green":  return Color(hex: 0x6BAA75)
+        case "red":    return Color(hex: 0xD94A2F)
+        case "pink":   return Color(hex: 0xE9A4BD)
+        case "purple": return Color(hex: 0x9B7BC4)
+        case "yellow": return Color(hex: 0xFFE6A8)
+        case "orange": return Color(hex: 0xE59745)
+        case "tan":    return Color(hex: 0xD8C0A2)
+        default:        return Color.black.opacity(0.12)
+        }
+    }
+
+    private var customTagAddButton: some View {
+        Button {
+            customTagDraft = ""
+            isCustomTagPromptPresented = true
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(.black)
+                .frame(width: 76, height: 24)
+                .background(Color.black.opacity(0.12), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .alert("Add Custom Tag", isPresented: $isCustomTagPromptPresented) {
+            TextField("Tag", text: $customTagDraft)
+            Button("Cancel", role: .cancel) { customTagDraft = "" }
+            Button("Add") { addCustomTag(customTagDraft) }
         }
     }
 
@@ -667,14 +769,16 @@ struct TagEditorView: View {
 
         aiSuggestedChips = Array(
             autoFilters.selectedCategories.prefix(3)
-                + autoFilters.weather.prefix(1)
+                + autoFilters.occasion.prefix(1)
                 + autoFilters.colors.prefix(1)
         ).map { $0.capitalized }
 
+        guard configuration.mode != .outfitUpload else { return }
+
         if autoFilters.categorySelectionCount > 0 { expandedSections.insert(.categories) }
-        if !autoFilters.weather.isEmpty  { expandedSections.insert(.weather) }
+        if !autoFilters.weather.isEmpty { expandedSections.insert(.weather) }
         if !autoFilters.occasion.isEmpty { expandedSections.insert(.occasion) }
-        if !autoFilters.colors.isEmpty   { expandedSections.insert(.colors) }
+        if !autoFilters.colors.isEmpty { expandedSections.insert(.colors) }
     }
 }
 

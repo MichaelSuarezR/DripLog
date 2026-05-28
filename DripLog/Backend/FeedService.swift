@@ -17,6 +17,11 @@ struct FeedPost: Identifiable {
     let isBookmarked: Bool
 }
 
+struct FeedPage {
+    let posts: [FeedPost]
+    let fetchedRowCount: Int
+}
+
 struct FeedStats {
     let followers: Int
     let following: Int
@@ -59,7 +64,7 @@ enum FeedScope: CaseIterable {
 // MARK: - FeedServicing
 
 protocol FeedServicing {
-    func fetchFeedPosts(scope: FeedScope, currentUserID: UUID, page: Int) async throws -> [FeedPost]
+    func fetchFeedPosts(scope: FeedScope, currentUserID: UUID, page: Int) async throws -> FeedPage
     func fetchStats(for userID: UUID) async throws -> FeedStats
     func follow(authorID: UUID, currentUserID: UUID) async throws
     func setLike(_ isLiked: Bool, outfitID: UUID, userID: UUID) async throws
@@ -78,7 +83,7 @@ struct SupabaseFeedService: FeedServicing {
         self.client = try client ?? SupabaseClientProvider.makeClient()
     }
 
-    func fetchFeedPosts(scope: FeedScope, currentUserID: UUID, page: Int) async throws -> [FeedPost] {
+    func fetchFeedPosts(scope: FeedScope, currentUserID: UUID, page: Int) async throws -> FeedPage {
         let from = page * pageSize
         let to = from + pageSize - 1
 
@@ -98,10 +103,10 @@ struct SupabaseFeedService: FeedServicing {
         case .recent:
             rows = try await fetchAllRows(from: from, to: to)
         case .friendsOnly:
-            guard !mutualFriendIDs.isEmpty else { return [] }
+            guard !mutualFriendIDs.isEmpty else { return FeedPage(posts: [], fetchedRowCount: 0) }
             rows = try await fetchFriendRows(friendIDs: mutualFriendIDs, from: from, to: to)
         case .saved:
-            guard !bookmarkedIDs.isEmpty else { return [] }
+            guard !bookmarkedIDs.isEmpty else { return FeedPage(posts: [], fetchedRowCount: 0) }
             rows = try await client
                 .from("outfits")
                 .select("id,user_id,image_path,caption,categories,weather,occasion,colors,visibility,created_at")
@@ -119,11 +124,7 @@ struct SupabaseFeedService: FeedServicing {
                     let profile = profiles[row.userID]
                     guard let signedURL = try? await self.client.storage
                         .from(self.bucketName)
-                        .createSignedURL(
-                            path: row.imagePath,
-                            expiresIn: 3600,
-                            transform: TransformOptions(width: 600, quality: 75)
-                        ) else {
+                        .createSignedURL(path: row.imagePath, expiresIn: 3600) else {
                             return nil
                         }
                     let allTags = (row.categories + row.weather + row.occasion + row.colors)
@@ -157,7 +158,7 @@ struct SupabaseFeedService: FeedServicing {
             return results.sorted { $0.createdAt > $1.createdAt }
         }
 
-        return posts
+        return FeedPage(posts: posts, fetchedRowCount: rows.count)
     }
 
     func fetchStats(for userID: UUID) async throws -> FeedStats {

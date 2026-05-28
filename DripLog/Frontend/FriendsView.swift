@@ -465,6 +465,7 @@ struct FriendProfileDetailView: View {
     @State private var didSendFollow = false
     @State private var errorMessage: String?
     @State private var outfitService: OutfitServicing?
+    @State private var selectedOutfit: OutfitPhoto?
 
     private let columns = [
         GridItem(.flexible(), spacing: 36),
@@ -510,6 +511,14 @@ struct FriendProfileDetailView: View {
         .task {
             await loadOutfits()
         }
+        .fullScreenCover(item: $selectedOutfit) { outfit in
+            FriendPostDetailView(
+                outfit: outfit,
+                onBack: {
+                    selectedOutfit = nil
+                }
+            )
+        }
     }
 
     private var profileHeader: some View {
@@ -520,18 +529,27 @@ struct FriendProfileDetailView: View {
                 .font(.system(size: 23, weight: .bold))
                 .foregroundStyle(.black)
 
-            Button {
-                Task { await follow() }
-            } label: {
-                Text((isSent || didSendFollow) ? "Following" : "Follow")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 218, height: 45)
-                    .background(Color.black, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            ZStack(alignment: .leading) {
+                Button {
+                    Task { await follow() }
+                } label: {
+                    Text((isSent || didSendFollow) ? "Following" : "Follow")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 218, height: 45)
+                        .background(Color.black, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(isSent || didSendFollow || isSendingFollow)
+                .opacity(isSendingFollow ? 0.7 : 1)
+
+                Image("followbuddy")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 84, height: 60)
+                    .offset(x: -48)
+                    .allowsHitTesting(false)
             }
-            .buttonStyle(.plain)
-            .disabled(isSent || didSendFollow || isSendingFollow)
-            .opacity(isSendingFollow ? 0.7 : 1)
         }
         .frame(maxWidth: .infinity)
     }
@@ -539,16 +557,25 @@ struct FriendProfileDetailView: View {
     private var outfitGrid: some View {
         LazyVGrid(columns: columns, spacing: 20) {
             ForEach(outfits) { outfit in
-                CachedAsyncImage(url: outfit.imageURL) { image in
-                    image
-                        .resizable()
-                        .scaledToFill()
+                Button {
+                    selectedOutfit = outfit
+                } label: {
+                    Color.black.opacity(0.08)
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay {
+                            GeometryReader { proxy in
+                                CachedAsyncImage(url: outfit.imageURL) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                }
+                                .frame(width: proxy.size.width, height: proxy.size.height)
+                                .clipped()
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 }
-                .frame(height: 232)
-                .frame(maxWidth: .infinity)
-                .background(Color.black.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                .clipped()
+                .buttonStyle(.plain)
             }
         }
     }
@@ -579,6 +606,116 @@ struct FriendProfileDetailView: View {
         let createdService = try SupabaseOutfitService()
         outfitService = createdService
         return createdService
+    }
+}
+
+private struct FriendPostDetailView: View {
+    let outfit: OutfitPhoto
+    let onBack: () -> Void
+
+    private static let titleDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    private static let detailDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.white
+                .ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(Self.titleDateFormatter.string(from: outfit.createdAt))
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+
+                    Color.black.opacity(0.08)
+                        .aspectRatio(1, contentMode: .fit)
+                        .overlay {
+                            GeometryReader { proxy in
+                                CachedAsyncImage(url: outfit.imageURL) { image in
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                }
+                                .frame(width: proxy.size.width, height: proxy.size.height)
+                                .clipped()
+                            }
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        .padding(.top, 20)
+
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(captionText)
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(.black)
+
+                            Text(Self.detailDateFormatter.string(from: outfit.createdAt))
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundStyle(Color(hex: 0x9BB3E1))
+                        }
+
+                        Spacer()
+
+                        HStack(spacing: 8) {
+                            Image(systemName: "heart")
+                            Image(systemName: "bookmark")
+                        }
+                        .font(.system(size: 35, weight: .regular))
+                        .foregroundStyle(.black)
+                    }
+                    .padding(.top, 11)
+
+                    if !outfit.tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(outfit.tags.prefix(6), id: \.self) { tag in
+                                    Text(tag.capitalized)
+                                        .font(.system(size: 14, weight: .regular))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 16)
+                                        .frame(height: 34)
+                                        .background(
+                                            Color(hex: 0x9BB3E1),
+                                            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        )
+                                }
+                            }
+                        }
+                        .padding(.top, 11)
+                    }
+                }
+                .padding(.horizontal, 31)
+                .padding(.bottom, 70)
+            }
+
+            Button("Back", action: onBack)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.black)
+                .buttonStyle(.plain)
+                .padding(.leading, 31)
+                .padding(.top, 42)
+        }
+    }
+
+    private var captionText: String {
+        if !outfit.customTags.isEmpty {
+            return outfit.customTags.joined(separator: ", ")
+        }
+
+        return "just posted a fit."
     }
 }
 

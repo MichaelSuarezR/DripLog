@@ -43,11 +43,6 @@ struct CustomTabBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 19)
-        .background(alignment: .bottom) {
-            Color.white
-                .frame(height: 24)
-                .ignoresSafeArea(edges: .bottom)
-        }
     }
 
     private func tabButton(imageName: String, tab: AppTab) -> some View {

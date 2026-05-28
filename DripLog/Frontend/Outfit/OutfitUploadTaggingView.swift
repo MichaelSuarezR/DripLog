@@ -13,6 +13,7 @@ struct OutfitUploadTaggingView: View {
 
     @State private var filters = ClosetFilters()
     @State private var promptText = ""
+    @State private var visibility: OutfitVisibility = .publicProfile
     @State private var isSaving = false
     @State private var saveError: String?
 
@@ -23,6 +24,7 @@ struct OutfitUploadTaggingView: View {
                 filters: $filters,
                 promptText: $promptText,
                 heroImage: image,
+                visibility: $visibility,
                 leadingHeaderAction: TagEditorHeaderAction(
                     title: "Cancel",
                     isDisabled: isSaving,
@@ -72,7 +74,7 @@ struct OutfitUploadTaggingView: View {
            !filters.custom.contains(where: { $0.caseInsensitiveCompare(trimmedInput) == .orderedSame }) {
             filters.custom.insert(trimmedInput)
         }
-        let metadata = filters.metadata
+        let metadata = filters.metadata(visibility: visibility)
         Task {
             isSaving = true
             saveError = nil

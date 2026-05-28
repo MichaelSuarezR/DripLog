@@ -19,6 +19,7 @@ struct HomeTab: View {
     @State private var authService: AuthServicing?
     @State private var selectedAuthor: FriendProfile?
     @State private var isShowingNotifications = false
+    private let pageSize = 5
 
     var body: some View {
         NavigationStack {
@@ -78,6 +79,12 @@ struct HomeTab: View {
                             ProgressView()
                                 .padding(.vertical, 16)
                                 .onAppear {
+                                    Task {
+                                        await loadNextPage(for: loadToken)
+                                    }
+                                }
+                                .onChange(of: isLoading) { _, loading in
+                                    guard !loading, hasMore else { return }
                                     Task {
                                         await loadNextPage(for: loadToken)
                                     }
@@ -296,7 +303,7 @@ struct HomeTab: View {
         do {
             let service = try getService()
 
-            let newPosts = try await service.fetchFeedPosts(
+            let page = try await service.fetchFeedPosts(
                 scope: selectedScope,
                 currentUserID: user.id,
                 page: currentPage
@@ -304,10 +311,10 @@ struct HomeTab: View {
 
             guard token == loadToken else { return }
 
-            posts.append(contentsOf: newPosts)
+            posts.append(contentsOf: page.posts)
             currentPage += 1
 
-            if newPosts.count < 5 {
+            if page.fetchedRowCount < pageSize {
                 hasMore = false
             }
 
@@ -529,33 +536,48 @@ struct FeedPostCard: View {
                 Spacer()
 
                 if let title = post.followStatus.buttonTitle {
-                    Button(action: onFollow) {
-                        Text(title)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 103, height: 29)
-                            .background(
-                                followButtonColor,
-                                in: RoundedRectangle(
-                                    cornerRadius: 5,
-                                    style: .continuous
+                    HStack(spacing: 0) {
+                        Image("followbuddy")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 76, height: 52)
+                            .offset(x: 30)
+                            .allowsHitTesting(false)
+
+                        Button(action: onFollow) {
+                            Text(title)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 103, height: 29)
+                                .background(
+                                    followButtonColor,
+                                    in: RoundedRectangle(
+                                        cornerRadius: 5,
+                                        style: .continuous
+                                    )
                                 )
-                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(post.followStatus != .notFollowing)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(post.followStatus != .notFollowing)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
 
-            CachedAsyncImage(url: post.imageURL) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 352)
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    GeometryReader { proxy in
+                        CachedAsyncImage(url: post.imageURL) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        }
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                    }
+                }
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: 8,
@@ -573,9 +595,10 @@ struct FeedPostCard: View {
             .padding(.horizontal, 4)
 
             HStack(alignment: .top) {
-                Text("OOTD")
+                Text(captionText)
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(.black)
+                    .lineLimit(2)
                     .allowsHitTesting(false)
 
                 Spacer()
@@ -605,13 +628,6 @@ struct FeedPostCard: View {
                 .foregroundStyle(Color(hex: 0x9BB3E1))
                 .padding(.horizontal, 13)
                 .padding(.top, 1)
-                .allowsHitTesting(false)
-
-            Text(captionText)
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 13)
-                .padding(.top, 6)
                 .allowsHitTesting(false)
 
             if !post.tags.isEmpty {

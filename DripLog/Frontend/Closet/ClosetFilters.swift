@@ -144,12 +144,17 @@ struct ClosetFilters {
     }
 
     var metadata: OutfitMetadata {
+        metadata(visibility: .publicProfile)
+    }
+
+    func metadata(visibility: OutfitVisibility) -> OutfitMetadata {
         OutfitMetadata(
             customTags:  custom.sorted(),
             categories:  selectedCategories,
             weather:     Self.weatherOptions.filter  { weather.contains($0) },
             occasion:    Self.occasionOptions.filter { occasion.contains($0) },
-            colors:      Self.colorOptions.filter    { colors.contains($0) }
+            colors:      Self.colorOptions.filter    { colors.contains($0) },
+            visibility:  visibility
         )
     }
 

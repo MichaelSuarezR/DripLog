@@ -26,7 +26,8 @@ struct OutfitEditView: View {
                 categories: photo.categories,
                 weather: photo.weather,
                 occasion: photo.occasion,
-                colors: photo.colors
+                colors: photo.colors,
+                visibility: photo.visibility
             )
         ))
     }

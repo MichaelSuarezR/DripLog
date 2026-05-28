@@ -288,7 +288,9 @@ struct HomeView: View {
                     categories: metadata.categories,
                     weather: metadata.weather,
                     occasion: metadata.occasion,
-                    colors: metadata.colors
+                    colors: metadata.colors,
+                    visibility: metadata.visibility,
+                    createdAt: existing.createdAt
                 )
             }
         } catch {

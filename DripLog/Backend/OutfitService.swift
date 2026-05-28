@@ -24,6 +24,8 @@ struct OutfitPhoto: Identifiable {
     let weather: [String]
     let occasion: [String]
     let colors: [String]
+    let visibility: OutfitVisibility
+    let createdAt: Date
 
     /// Compressed 600px-wide version of the image for use in suggestion cards.
     /// Falls back to full-res if the URL can't be transformed.
@@ -38,6 +40,7 @@ struct OutfitMetadata {
     let weather: [String]
     let occasion: [String]
     let colors: [String]
+    let visibility: OutfitVisibility
 
     var allTags: [String] {
         var ordered = categories
@@ -53,7 +56,8 @@ struct OutfitMetadata {
         categories: [],
         weather: [],
         occasion: [],
-        colors: []
+        colors: [],
+        visibility: .publicProfile
     )
 }
 
@@ -140,7 +144,7 @@ struct SupabaseOutfitService: OutfitServicing {
     func fetchOutfits(for userID: UUID) async throws -> [OutfitPhoto] {
         let response: PostgrestResponse<[OutfitRow]> = try await client
             .from("outfits")
-            .select("id,image_path,caption,categories,weather,occasion,colors")
+            .select("id,image_path,caption,categories,weather,occasion,colors,visibility,created_at")
             .eq("user_id", value: userID)
             .order("created_at", ascending: false)
             .execute()
@@ -166,7 +170,9 @@ struct SupabaseOutfitService: OutfitServicing {
                 categories: row.metadata.categories,
                 weather: row.metadata.weather,
                 occasion: row.metadata.occasion,
-                colors: row.metadata.colors
+                colors: row.metadata.colors,
+                visibility: row.metadata.visibility,
+                createdAt: row.createdAt
             )
         }
     }
@@ -212,7 +218,7 @@ struct SupabaseOutfitService: OutfitServicing {
             weather: normalizedMetadata.weather,
             occasion: normalizedMetadata.occasion,
             colors: normalizedMetadata.colors,
-            visibility: OutfitVisibility.publicProfile.title
+            visibility: normalizedMetadata.visibility.title
         )
         try await client
             .from("outfits")
@@ -233,7 +239,9 @@ struct SupabaseOutfitService: OutfitServicing {
             categories: normalizedMetadata.categories,
             weather: normalizedMetadata.weather,
             occasion: normalizedMetadata.occasion,
-            colors: normalizedMetadata.colors
+            colors: normalizedMetadata.colors,
+            visibility: normalizedMetadata.visibility,
+            createdAt: Date()
         )
     }
 
@@ -287,7 +295,8 @@ struct SupabaseOutfitService: OutfitServicing {
                     categories: normalizedMetadata.categories,
                     weather: normalizedMetadata.weather,
                     occasion: normalizedMetadata.occasion,
-                    colors: normalizedMetadata.colors
+                    colors: normalizedMetadata.colors,
+                    visibility: normalizedMetadata.visibility.title
                 )
             )
             .eq("id", value: outfitID)
@@ -332,7 +341,8 @@ struct SupabaseOutfitService: OutfitServicing {
             categories: metadata.categories.map(normalizeTag(_:)).filter { !$0.isEmpty },
             weather: metadata.weather.map(normalizeTag(_:)).filter { !$0.isEmpty },
             occasion: metadata.occasion.map(normalizeTag(_:)).filter { !$0.isEmpty },
-            colors: metadata.colors.map(normalizeTag(_:)).filter { !$0.isEmpty }
+            colors: metadata.colors.map(normalizeTag(_:)).filter { !$0.isEmpty },
+            visibility: metadata.visibility
         )
     }
 
@@ -494,7 +504,8 @@ struct SupabaseAutoTagService: AutoTagServicing {
             categories: decoded.categories,
             weather: decoded.weather,
             occasion: decoded.occasion,
-            colors: decoded.colors
+            colors: decoded.colors,
+            visibility: .publicProfile
         )
     }
 
@@ -543,6 +554,7 @@ private struct OutfitRow: Decodable {
     let id: UUID
     let imagePath: String
     let metadata: OutfitMetadata
+    let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -552,12 +564,15 @@ private struct OutfitRow: Decodable {
         case weather
         case occasion
         case colors
+        case visibility
+        case createdAt = "created_at"
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         imagePath = try container.decode(String.self, forKey: .imagePath)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
 
         let customTags: [String]
         if let caption = try container.decodeIfPresent(String.self, forKey: .caption) {
@@ -571,7 +586,10 @@ private struct OutfitRow: Decodable {
             categories: try container.decodeIfPresent([String].self, forKey: .categories) ?? [],
             weather: try container.decodeIfPresent([String].self, forKey: .weather) ?? [],
             occasion: try container.decodeIfPresent([String].self, forKey: .occasion) ?? [],
-            colors: try container.decodeIfPresent([String].self, forKey: .colors) ?? []
+            colors: try container.decodeIfPresent([String].self, forKey: .colors) ?? [],
+            visibility: OutfitVisibility(
+                title: try container.decodeIfPresent(String.self, forKey: .visibility) ?? ""
+            ) ?? .publicProfile
         )
     }
 }
@@ -678,6 +696,7 @@ private struct OutfitUpdate: Encodable {
     let weather: [String]
     let occasion: [String]
     let colors: [String]
+    let visibility: String
 }
 
 private struct UploadPayload {

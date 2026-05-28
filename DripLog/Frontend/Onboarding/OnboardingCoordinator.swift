@@ -174,7 +174,8 @@ struct OnboardingCoordinator: View {
             categories: [],
             weather: [],
             occasion: [],
-            colors: []
+            colors: [],
+            visibility: .publicProfile
         )
 
         do {
