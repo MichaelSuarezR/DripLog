@@ -4,6 +4,8 @@ struct HomeTab: View {
     let user: AppUser
     let onProfileTapped: () -> Void
 
+    @EnvironmentObject private var tutorialManager: TutorialManager
+
     @State private var selectedScope: FeedScope = .recent
     @State private var posts: [FeedPost] = []
     @State private var currentPage = 0
@@ -35,6 +37,7 @@ struct HomeTab: View {
                     if posts.isEmpty && isLoading {
                         ProgressView()
                             .padding(.top, 40)
+
                     } else if let errorMessage {
                         Text(errorMessage)
                             .font(.subheadline)
@@ -42,6 +45,7 @@ struct HomeTab: View {
                             .multilineTextAlignment(.center)
                             .padding(.top, 40)
                             .padding(.horizontal, 24)
+
                     } else if posts.isEmpty {
                         Text(emptyFeedMessage)
                             .font(.subheadline)
@@ -49,6 +53,7 @@ struct HomeTab: View {
                             .multilineTextAlignment(.center)
                             .padding(.top, 40)
                             .padding(.horizontal, 24)
+
                     } else {
                         ForEach(posts) { post in
                             FeedPostCard(
@@ -73,8 +78,11 @@ struct HomeTab: View {
                             ProgressView()
                                 .padding(.vertical, 16)
                                 .onAppear {
-                                    Task { await loadNextPage(for: loadToken) }
+                                    Task {
+                                        await loadNextPage(for: loadToken)
+                                    }
                                 }
+
                         } else if !posts.isEmpty {
                             Text("you're all caught up")
                                 .font(.caption)
@@ -90,6 +98,15 @@ struct HomeTab: View {
             }
             .background(Color.white)
             .toolbar(.hidden, for: .navigationBar)
+            .tutorialAnchor(step: .feed)
+            .overlay {
+                TutorialOverlay(
+                    step: .feed,
+                    title: "Your feed",
+                    message: "See what friends are wearing, get inspired, and share your own OOTDs here.",
+                    anchorFrame: tutorialManager.anchorFrames[.feed]
+                )
+            }
             .task {
                 await loadProfilePhoto()
                 await loadStats()
@@ -174,6 +191,7 @@ struct HomeTab: View {
             Text("\(value)")
                 .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(.black)
+
             Text(label)
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.black)
@@ -192,8 +210,13 @@ struct HomeTab: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 25)
                         .background(
-                            selectedScope == scope ? Color(hex: 0xE4432D) : Color(hex: 0x9BB3E1),
-                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                            selectedScope == scope
+                            ? Color(hex: 0xE4432D)
+                            : Color(hex: 0x9BB3E1),
+                            in: RoundedRectangle(
+                                cornerRadius: 11,
+                                style: .continuous
+                            )
                         )
                 }
                 .buttonStyle(.plain)
@@ -213,7 +236,10 @@ struct HomeTab: View {
     }
 
     private func service() throws -> AuthServicing {
-        if let authService { return authService }
+        if let authService {
+            return authService
+        }
+
         let createdService = try SupabaseAuthService()
         authService = createdService
         return createdService
@@ -229,11 +255,17 @@ struct HomeTab: View {
 
     private func selectScope(_ scope: FeedScope) {
         guard selectedScope != scope else { return }
+
         selectedScope = scope
         loadToken = UUID()
+
         let token = loadToken
+
         resetFeedState()
-        Task { await loadNextPage(for: token) }
+
+        Task {
+            await loadNextPage(for: token)
+        }
     }
 
     private func resetFeedState() {
@@ -246,8 +278,15 @@ struct HomeTab: View {
 
     private func loadNextPage(for token: UUID? = nil) async {
         let token = token ?? loadToken
-        guard token == loadToken && !isLoading && hasMore else { return }
+
+        guard token == loadToken,
+              !isLoading,
+              hasMore else {
+            return
+        }
+
         isLoading = true
+
         defer {
             if token == loadToken {
                 isLoading = false
@@ -256,17 +295,25 @@ struct HomeTab: View {
 
         do {
             let service = try getService()
+
             let newPosts = try await service.fetchFeedPosts(
                 scope: selectedScope,
                 currentUserID: user.id,
                 page: currentPage
             )
+
             guard token == loadToken else { return }
+
             posts.append(contentsOf: newPosts)
             currentPage += 1
-            if newPosts.count < 5 { hasMore = false }
+
+            if newPosts.count < 5 {
+                hasMore = false
+            }
+
         } catch {
             guard token == loadToken else { return }
+
             errorMessage = "Could not load feed right now: \(error.localizedDescription)"
             hasMore = false
         }
@@ -274,13 +321,20 @@ struct HomeTab: View {
 
     private func toggleBookmark(for post: FeedPost) async {
         let newValue = !post.isBookmarked
+
         setBookmarkState(newValue, for: post.id)
+
         if selectedScope == .saved && !newValue {
             posts.removeAll { $0.id == post.id }
         }
 
         do {
-            try await getService().setBookmark(newValue, outfitID: post.id, userID: user.id)
+            try await getService().setBookmark(
+                newValue,
+                outfitID: post.id,
+                userID: user.id
+            )
+
         } catch {
             if selectedScope != .saved {
                 setBookmarkState(post.isBookmarked, for: post.id)
@@ -290,10 +344,16 @@ struct HomeTab: View {
 
     private func toggleLike(for post: FeedPost) async {
         let newValue = !post.isLiked
+
         setLikeState(newValue, for: post.id)
 
         do {
-            try await getService().setLike(newValue, outfitID: post.id, userID: user.id)
+            try await getService().setLike(
+                newValue,
+                outfitID: post.id,
+                userID: user.id
+            )
+
         } catch {
             setLikeState(post.isLiked, for: post.id)
         }
@@ -301,9 +361,17 @@ struct HomeTab: View {
 
     private func follow(_ authorID: UUID) async {
         do {
-            try await getService().follow(authorID: authorID, currentUserID: user.id)
+            try await getService().follow(
+                authorID: authorID,
+                currentUserID: user.id
+            )
+
             posts = posts.map { existing in
-                guard existing.authorID == authorID, existing.followStatus == .notFollowing else { return existing }
+                guard existing.authorID == authorID,
+                      existing.followStatus == .notFollowing else {
+                    return existing
+                }
+
                 return FeedPost(
                     id: existing.id,
                     authorID: existing.authorID,
@@ -318,9 +386,14 @@ struct HomeTab: View {
                     isBookmarked: existing.isBookmarked
                 )
             }
+
         } catch {
             posts = posts.map { existing in
-                guard existing.authorID == authorID, existing.followStatus == .following else { return existing }
+                guard existing.authorID == authorID,
+                      existing.followStatus == .following else {
+                    return existing
+                }
+
                 return replacing(existing, followStatus: .notFollowing)
             }
         }
@@ -346,14 +419,20 @@ struct HomeTab: View {
 
     private func setLikeState(_ isLiked: Bool, for outfitID: UUID) {
         posts = posts.map { existing in
-            guard existing.id == outfitID else { return existing }
+            guard existing.id == outfitID else {
+                return existing
+            }
+
             return replacing(existing, isLiked: isLiked)
         }
     }
 
     private func setBookmarkState(_ isBookmarked: Bool, for outfitID: UUID) {
         posts = posts.map { existing in
-            guard existing.id == outfitID else { return existing }
+            guard existing.id == outfitID else {
+                return existing
+            }
+
             return replacing(existing, isBookmarked: isBookmarked)
         }
     }
@@ -380,26 +459,38 @@ struct HomeTab: View {
     }
 
     private func getService() throws -> any FeedServicing {
-        if let feedService { return feedService }
+        if let feedService {
+            return feedService
+        }
+
         let service = try SupabaseFeedService()
         feedService = service
         return service
     }
 
     private var displayName: String {
-        let trimmedName = user.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let firstName = trimmedName.split(separator: " ").first.map(String.init) ?? ""
+        let trimmedName = user.name.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        let firstName = trimmedName
+            .split(separator: " ")
+            .first
+            .map(String.init) ?? ""
+
         return firstName.isEmpty ? "Matthew" : firstName
     }
 
     private var emptyFeedMessage: String {
         switch selectedScope {
         case .recent:
-            "No public posts yet."
+            return "No public posts yet."
+
         case .friendsOnly:
-            "No friends-only posts yet."
+            return "No friends-only posts yet."
+
         case .saved:
-            "No saved posts yet."
+            return "No saved posts yet."
         }
     }
 }
@@ -443,7 +534,13 @@ struct FeedPostCard: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(.white)
                             .frame(width: 103, height: 29)
-                            .background(followButtonColor, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                            .background(
+                                followButtonColor,
+                                in: RoundedRectangle(
+                                    cornerRadius: 5,
+                                    style: .continuous
+                                )
+                            )
                     }
                     .buttonStyle(.plain)
                     .disabled(post.followStatus != .notFollowing)
@@ -459,8 +556,18 @@ struct FeedPostCard: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 352)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 8,
+                    style: .continuous
+                )
+            )
+            .contentShape(
+                RoundedRectangle(
+                    cornerRadius: 8,
+                    style: .continuous
+                )
+            )
             .clipped()
             .allowsHitTesting(false)
             .padding(.horizontal, 4)
@@ -470,11 +577,16 @@ struct FeedPostCard: View {
                     .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(.black)
                     .allowsHitTesting(false)
+
                 Spacer()
 
                 Button(action: onLikeToggle) {
                     Image(systemName: post.isLiked ? "heart.fill" : "heart")
-                        .foregroundStyle(post.isLiked ? Color(hex: 0xE4432D) : .black)
+                        .foregroundStyle(
+                            post.isLiked
+                            ? Color(hex: 0xE4432D)
+                            : .black
+                        )
                 }
                 .buttonStyle(.plain)
 
@@ -511,7 +623,13 @@ struct FeedPostCard: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 13)
                                 .frame(height: 22)
-                                .background(Color(hex: 0x9BB3E1), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                .background(
+                                    Color(hex: 0x9BB3E1),
+                                    in: RoundedRectangle(
+                                        cornerRadius: 6,
+                                        style: .continuous
+                                    )
+                                )
                                 .allowsHitTesting(false)
                         }
                     }
@@ -525,22 +643,30 @@ struct FeedPostCard: View {
     }
 
     private var captionText: String {
-        let trimmed = post.caption?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !trimmed.isEmpty else { return "just posted a fit." }
+        let trimmed = post.caption?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        guard !trimmed.isEmpty else {
+            return "just posted a fit."
+        }
+
         if let data = trimmed.data(using: .utf8),
            let decoded = try? JSONDecoder().decode([String].self, from: data),
            !decoded.isEmpty {
             return decoded.joined(separator: ", ")
         }
+
         return trimmed
     }
 
     private var followButtonColor: Color {
-        post.followStatus == .notFollowing ? .black : Color(hex: 0x9BB3E1)
+        post.followStatus == .notFollowing
+        ? .black
+        : Color(hex: 0x9BB3E1)
     }
 }
 
-// MARK: - FeedFilterChip
+// MARK: - FeedProfileAvatar
 
 private struct FeedProfileAvatar: View {
     let url: URL?
@@ -554,10 +680,12 @@ private struct FeedProfileAvatar: View {
                         image
                             .resizable()
                             .scaledToFill()
+
                     default:
                         placeholder
                     }
                 }
+
             } else {
                 placeholder
             }
@@ -577,6 +705,8 @@ private struct FeedProfileAvatar: View {
     }
 }
 
+// MARK: - FeedFilterChip
+
 struct FeedFilterChip: View {
     let title: String
     var isActive: Bool = false
@@ -590,8 +720,13 @@ struct FeedFilterChip: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 25)
                 .background(
-                    isActive ? Color(hex: 0xE4432D) : Color(hex: 0x9BB3E1),
-                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    isActive
+                    ? Color(hex: 0xE4432D)
+                    : Color(hex: 0x9BB3E1),
+                    in: RoundedRectangle(
+                        cornerRadius: 11,
+                        style: .continuous
+                    )
                 )
                 .frame(height: 40)
                 .contentShape(Rectangle())
@@ -599,6 +734,8 @@ struct FeedFilterChip: View {
         .buttonStyle(.plain)
     }
 }
+
+// MARK: - FeedSmallAvatar
 
 private struct FeedSmallAvatar: View {
     let url: URL?
@@ -612,10 +749,12 @@ private struct FeedSmallAvatar: View {
                         image
                             .resizable()
                             .scaledToFill()
+
                     default:
                         placeholder
                     }
                 }
+
             } else {
                 placeholder
             }

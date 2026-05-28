@@ -282,6 +282,7 @@ struct TagEditorView: View {
             }
         }
         .padding(.top, 4)
+        .tutorialAnchor(step: .aiTags)
     }
 
     private func aiChipButton(_ label: String) -> some View {
@@ -398,6 +399,7 @@ struct TagEditorView: View {
             }
         }
         .padding(.top, configuration.showsPromptRow ? 12 : 0)
+        .tutorialAnchor(step: .dropdowns)
     }
 
     private var categoryTitle: String {

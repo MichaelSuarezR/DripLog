@@ -1,3 +1,5 @@
+// ProfileTab.swift — FULL FILE
+
 import SwiftUI
 
 struct ProfileTab: View {
@@ -11,6 +13,8 @@ struct ProfileTab: View {
     let onProfileTapped: () -> Void
     let onLoadOutfits: () async -> Void
     let onRefreshOutfits: () async -> Void
+
+    @EnvironmentObject private var tutorialManager: TutorialManager  // NEW
 
     @State private var isFilterPresented = false
     @State private var filters = ClosetFilters()
@@ -28,6 +32,7 @@ struct ProfileTab: View {
                 VStack(alignment: .leading, spacing: 18) {
                     headerRow
                     inspirationBanner
+                        .tutorialAnchor(step: .generateOutfit)  // NEW
                     closetHeader
                     if let errorMessage {
                         Text(errorMessage)
@@ -35,6 +40,7 @@ struct ProfileTab: View {
                             .foregroundStyle(.red)
                     }
                     outfitsSection
+                        .tutorialAnchor(step: .closetGrid)      // NEW
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 20)
@@ -57,6 +63,21 @@ struct ProfileTab: View {
                     .modalEntryTransition()
             }
             .animation(AppAnimation.standardSpring, value: isFilterPresented)
+            // Tutorial overlays for closet steps
+            .overlay {
+                TutorialOverlay(
+                    step: .closetGrid,
+                    title: "Your closet",
+                    message: "Every outfit you upload lives here. Use the filter to find exactly what you need.",
+                    anchorFrame: tutorialManager.anchorFrames[.closetGrid]
+                )
+                TutorialOverlay(
+                    step: .generateOutfit,
+                    title: "Don't know what to wear?",
+                    message: "Tap Generate Outfit and we'll build a look from your closet using AI.",
+                    anchorFrame: tutorialManager.anchorFrames[.generateOutfit]
+                )
+            }
         }
     }
 
@@ -133,13 +154,9 @@ struct ProfileTab: View {
     private var outfitsSection: some View {
         LazyVGrid(columns: columns, spacing: 12) {
             if isLoadingOutfits && outfitPhotos.isEmpty {
-                ForEach(0..<6, id: \.self) { _ in
-                    closetPlaceholderCard
-                }
+                ForEach(0..<6, id: \.self) { _ in closetPlaceholderCard }
             } else if filteredOutfits.isEmpty {
-                ForEach(0..<6, id: \.self) { _ in
-                    closetPlaceholderCard
-                }
+                ForEach(0..<6, id: \.self) { _ in closetPlaceholderCard }
             } else {
                 ForEach(filteredOutfits) { photo in
                     VStack(alignment: .leading, spacing: 6) {
@@ -206,30 +223,13 @@ struct ProfileTab: View {
 
     private var filteredOutfits: [OutfitPhoto] {
         guard filters.hasActiveSelections else { return outfitPhotos }
-
         return outfitPhotos.filter { photo in
             let normalizedTags = Set(photo.tags.map { $0.lowercased() })
-
-            if !filters.categoryMatches(tags: normalizedTags) {
-                return false
-            }
-
-            if !filters.weather.isEmpty && normalizedTags.isDisjoint(with: filters.weatherNormalized) {
-                return false
-            }
-
-            if !filters.occasion.isEmpty && normalizedTags.isDisjoint(with: filters.occasionNormalized) {
-                return false
-            }
-
-            if !filters.colors.isEmpty && normalizedTags.isDisjoint(with: filters.colorsNormalized) {
-                return false
-            }
-
-            if !filters.custom.isEmpty && normalizedTags.isDisjoint(with: filters.customNormalized) {
-                return false
-            }
-
+            if !filters.categoryMatches(tags: normalizedTags) { return false }
+            if !filters.weather.isEmpty && normalizedTags.isDisjoint(with: filters.weatherNormalized) { return false }
+            if !filters.occasion.isEmpty && normalizedTags.isDisjoint(with: filters.occasionNormalized) { return false }
+            if !filters.colors.isEmpty && normalizedTags.isDisjoint(with: filters.colorsNormalized) { return false }
+            if !filters.custom.isEmpty && normalizedTags.isDisjoint(with: filters.customNormalized) { return false }
             return true
         }
     }
@@ -268,9 +268,7 @@ private struct ClosetProfileAvatar: View {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
+                        image.resizable().scaledToFill()
                     default:
                         placeholder
                     }

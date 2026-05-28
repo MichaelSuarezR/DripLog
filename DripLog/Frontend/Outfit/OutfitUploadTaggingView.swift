@@ -1,10 +1,15 @@
+// OutfitUploadTaggingView.swift — FULL FILE
+
 import SwiftUI
 import UIKit
 
 struct OutfitUploadTaggingView: View {
     let image: UIImage
+    var isTutorial: Bool = false         // NEW: true when opened by tutorial
     let onCancel: () -> Void
     let onSave: (OutfitMetadata) async throws -> Void
+
+    @EnvironmentObject private var tutorialManager: TutorialManager  // NEW
 
     @State private var filters = ClosetFilters()
     @State private var promptText = ""
@@ -14,11 +19,15 @@ struct OutfitUploadTaggingView: View {
     var body: some View {
         NavigationStack {
             TagEditorView(
-                configuration: .outfitUpload,
+                configuration: isTutorial ? .onboardingTagging : .outfitUpload,
                 filters: $filters,
                 promptText: $promptText,
                 heroImage: image,
-                leadingHeaderAction: TagEditorHeaderAction(title: "Cancel", isDisabled: isSaving, handler: onCancel),
+                leadingHeaderAction: TagEditorHeaderAction(
+                    title: "Cancel",
+                    isDisabled: isSaving,
+                    handler: onCancel
+                ),
                 trailingHeaderAction: TagEditorHeaderAction(
                     title: isSaving ? "Saving..." : "Save",
                     isDisabled: isSaving,
@@ -35,26 +44,39 @@ struct OutfitUploadTaggingView: View {
                         .padding(.top, 8)
                 }
             }
+            // Tutorial overlays — only visible when isTutorial = true
+            .overlay {
+                if isTutorial {
+                    TutorialOverlay(
+                        step: .aiTags,
+                        title: "AI does the work",
+                        message: "We scan your photo and suggest tags automatically. Tap any chip to add it.",
+                        anchorFrame: tutorialManager.anchorFrames[.aiTags]
+                    )
+                    TutorialOverlay(
+                        step: .dropdowns,
+                        title: "Tag your way",
+                        message: "Use these dropdowns to add category, weather, occasion and colors — makes finding outfits easy later.",
+                        anchorFrame: tutorialManager.anchorFrames[.dropdowns]
+                    )
+                }
+            }
             .modalEntryTransition()
         }
     }
 
     private func saveOutfit() {
         guard !isSaving else { return }
-
         let trimmedInput = promptText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedInput.isEmpty,
            !filters.custom.contains(where: { $0.caseInsensitiveCompare(trimmedInput) == .orderedSame }) {
             filters.custom.insert(trimmedInput)
         }
-
         let metadata = filters.metadata
-
         Task {
             isSaving = true
             saveError = nil
             defer { isSaving = false }
-
             do {
                 try await onSave(metadata)
             } catch {

@@ -1,9 +1,4 @@
-//
-//  HomeView.swift
-//  DripLog
-//
-//  Created by Michael Suarez-Russell on 4/21/26.
-//
+// HomeView.swift — FULL FILE
 
 import SwiftUI
 import UIKit
@@ -45,6 +40,19 @@ struct HomeView: View {
     @State private var suggestions: OutfitSuggestions?
     @State private var suggestionErrorMessage: String?
 
+    // MARK: Tutorial state
+    @StateObject private var tutorialManager: TutorialManager
+    @State private var tutorialPhotoImage: UIImage?
+    @State private var isTutorialTagEditorOpen = false
+    @State private var tutorialDidAttemptOpen = false
+
+    init(user: AppUser, onUserUpdated: @escaping (AppUser) -> Void, onLogOut: @escaping () -> Void) {
+    self.user = user
+    self.onUserUpdated = onUserUpdated
+    self.onLogOut = onLogOut
+    _tutorialManager = StateObject(wrappedValue: TutorialManager(userID: user.id.uuidString))
+}
+
     var body: some View {
         ZStack(alignment: .bottom) {
             selectedTabView
@@ -52,11 +60,31 @@ struct HomeView: View {
 
             CustomTabBar(selectedTab: $selectedTab)
         }
+        .environmentObject(tutorialManager)
+        .onPreferenceChange(TutorialAnchorKey.self) { anchors in
+            for anchor in anchors {
+                tutorialManager.registerFrame(anchor.frame, for: anchor.step)
+            }
+        }
         .onChange(of: selectedTab) { _, newTab in
             guard newTab == .closet else { return }
+            Task { await loadOutfitsIfNeeded() }
+        }
+        .onChange(of: outfitPhotos.count) { _, count in
+            guard
+                !tutorialDidAttemptOpen,
+                tutorialManager.shouldShow,
+                count > 0
+            else { return }
+
+            tutorialDidAttemptOpen = true
+
             Task {
-                await loadOutfitsIfNeeded()
+                await openTutorialTagEditor(photos: outfitPhotos)
             }
+        }
+        .onChange(of: tutorialManager.currentStep) { _, step in
+            handleTutorialStepChange(step)
         }
         .fullScreenCover(item: $pendingOutfitDraft) { draft in
             OutfitUploadTaggingView(
@@ -72,6 +100,35 @@ struct HomeView: View {
                 }
             )
             .modalEntryTransition()
+        }
+        .fullScreenCover(isPresented: $isTutorialTagEditorOpen) {
+            if let image = tutorialPhotoImage {
+                OutfitUploadTaggingView(
+                    image: image,
+                    isTutorial: true,
+                    onCancel: {
+                        // User dismissed tutorial tag editor — skip to closet steps
+                        isTutorialTagEditorOpen = false
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            selectedTab = .closet
+                            tutorialManager.currentStep = .closetGrid
+                            tutorialManager.isActive = true
+                        }
+                    },
+                    onSave: { _ in
+                        // Don't re-upload — photo already uploaded during onboarding
+                        // Just advance tutorial to closet
+                        isTutorialTagEditorOpen = false
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            selectedTab = .closet
+                            tutorialManager.currentStep = .closetGrid
+                            tutorialManager.isActive = true
+                        }
+                    }
+                )
+                .environmentObject(tutorialManager)
+                .modalEntryTransition()
+            }
         }
         .fullScreenCover(item: $editingOutfit) { photo in
             OutfitEditView(
@@ -90,9 +147,7 @@ struct HomeView: View {
                 suggestions: suggestions,
                 isLoading: isLoadingSuggestions,
                 errorMessage: suggestionErrorMessage,
-                onClose: {
-                    isSuggestionsPresented = false
-                },
+                onClose: { isSuggestionsPresented = false },
                 onRetry: prepareSuggestions
             )
         }
@@ -100,9 +155,7 @@ struct HomeView: View {
             UserProfileView(
                 user: user,
                 onUserUpdated: onUserUpdated,
-                onClose: {
-                    isProfilePresented = false
-                },
+                onClose: { isProfilePresented = false },
                 onLogOut: {
                     isProfilePresented = false
                     onLogOut()
@@ -125,15 +178,9 @@ struct HomeView: View {
                 onLogOut: onLogOut,
                 onEditOutfit: { editingOutfit = $0 },
                 onAskForSuggestions: prepareSuggestions,
-                onProfileTapped: {
-                    isProfilePresented = true
-                },
-                onLoadOutfits: {
-                    await loadOutfitsIfNeeded()
-                },
-                onRefreshOutfits: {
-                    await loadOutfits(force: true)
-                }
+                onProfileTapped: { isProfilePresented = true },
+                onLoadOutfits: { await loadOutfitsIfNeeded() },
+                onRefreshOutfits: { await loadOutfits(force: true) }
             )
         case .add:
             CreateTab(
@@ -144,10 +191,45 @@ struct HomeView: View {
         case .feed:
             HomeTab(
                 user: user,
-                onProfileTapped: {
-                    isProfilePresented = true
-                }
+                onProfileTapped: { isProfilePresented = true }
             )
+        }
+    }
+
+    // MARK: - Tutorial Helpers
+
+    private func openTutorialTagEditor(photos: [OutfitPhoto]) async {
+        guard let randomPhoto = photos.randomElement() else { return }
+        let url = randomPhoto.imageURL
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let image = UIImage(data: data) else { return }
+            tutorialPhotoImage = image
+            tutorialManager.start()
+            isTutorialTagEditorOpen = true
+        } catch {
+            // If image fails to load, skip tag editor steps and start from closet
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedTab = .closet
+                tutorialManager.currentStep = .closetGrid
+                tutorialManager.isActive = true
+            }
+        }
+    }
+
+    private func handleTutorialStepChange(_ step: TutorialStep) {
+        switch step {
+        case .closetGrid, .generateOutfit:
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedTab = .closet
+            }
+        case .feed:
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedTab = .feed
+            }
+        default:
+            break
         }
     }
 
@@ -161,9 +243,7 @@ struct HomeView: View {
         guard (force || !didLoadOutfits), !isLoadingOutfits else { return }
         isLoadingOutfits = true
         outfitErrorMessage = nil
-        defer {
-            isLoadingOutfits = false
-        }
+        defer { isLoadingOutfits = false }
 
         do {
             outfitPhotos = try await service().fetchOutfits(for: user.id)
@@ -196,7 +276,6 @@ struct HomeView: View {
     private func updateOutfitMetadata(_ metadata: OutfitMetadata, for outfitID: UUID) async {
         do {
             try await service().updateOutfitMetadata(metadata, for: outfitID)
-
             if let index = outfitPhotos.firstIndex(where: { $0.id == outfitID }) {
                 let existing = outfitPhotos[index]
                 outfitPhotos[index] = OutfitPhoto(
@@ -237,16 +316,12 @@ struct HomeView: View {
         Task {
             do {
                 let result = try await suggestionProvider().makeSuggestions(for: user, outfitPhotos: outfitPhotos)
-
-                // Prefetch all images into cache while spinner is still showing.
-                // This way images appear instantly when the sheet renders.
                 let imageURLs = [
                     result.leftOutfit.thumbnailURL,
                     result.centerInspiration.imageURL,
                     result.rightOutfit.thumbnailURL
                 ]
                 await ImageCache.shared.prefetch(urls: imageURLs)
-
                 suggestions = result
             } catch {
                 suggestionErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not build suggestions right now."
@@ -275,5 +350,9 @@ struct HomeView: View {
 // MARK: - Preview
 
 #Preview {
-    HomeView(user: AppUser(id: UUID(), name: "Michael", email: "michael@example.com"), onUserUpdated: { _ in }, onLogOut: {})
+    HomeView(
+        user: AppUser(id: UUID(), name: "Michael", email: "michael@example.com"),
+        onUserUpdated: { _ in },
+        onLogOut: {}
+    )
 }
