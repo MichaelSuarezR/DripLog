@@ -15,6 +15,7 @@ where status = 'pending';
 
 drop policy if exists "Users can send friend requests" on public.friendships;
 drop policy if exists "Users can accept requests sent to them" on public.friendships;
+drop policy if exists "Users can follow accounts" on public.friendships;
 
 create policy "Users can follow accounts"
 on public.friendships

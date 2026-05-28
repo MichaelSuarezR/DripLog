@@ -38,6 +38,7 @@ struct HomeView: View {
     @State private var isProfilePresented = false
     @State private var isLoadingSuggestions = false
     @State private var suggestions: OutfitSuggestions?
+    @State private var suggestionsLocalDate: String?
     @State private var suggestionErrorMessage: String?
 
     // MARK: Tutorial state
@@ -308,6 +309,15 @@ struct HomeView: View {
     // MARK: - Suggestions
 
     private func prepareSuggestions() {
+        let today = Self.localDateString()
+
+        if suggestions != nil && suggestionsLocalDate == today {
+            suggestionErrorMessage = nil
+            isLoadingSuggestions = false
+            isSuggestionsPresented = true
+            return
+        }
+
         isSuggestionsPresented = true
         isLoadingSuggestions = true
         suggestionErrorMessage = nil
@@ -323,11 +333,22 @@ struct HomeView: View {
                 ]
                 await ImageCache.shared.prefetch(urls: imageURLs)
                 suggestions = result
+                suggestionsLocalDate = today
             } catch {
                 suggestionErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not build suggestions right now."
             }
             isLoadingSuggestions = false
         }
+    }
+
+    private static func localDateString(for date: Date = Date()) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        let year = components.year ?? 1970
+        let month = components.month ?? 1
+        let day = components.day ?? 1
+        return String(format: "%04d-%02d-%02d", year, month, day)
     }
 
     // MARK: - Service Accessors

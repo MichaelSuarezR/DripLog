@@ -21,6 +21,10 @@ type InspirationRow = {
   gender: string | null
 }
 
+type ProfileRow = {
+  gender: string | null
+}
+
 type WeatherSnapshot = {
   location_name: string | null
   summary: string
@@ -52,6 +56,21 @@ type ShortlistedInspiration = {
 type OutfitWithImage = ShortlistedOutfit & {
   base64: string
   mimeType: string
+}
+
+type GeminiSuggestionPayload = {
+  left_outfit_id: string
+  right_outfit_id: string
+  inspiration_id: string
+  explanation: string
+}
+
+type DailySuggestionRow = {
+  left_outfit_id: string
+  right_outfit_id: string
+  inspiration: ShortlistedInspiration
+  weather: WeatherSnapshot
+  explanation: string
 }
 
 const corsHeaders = {
@@ -89,6 +108,9 @@ Deno.serve(async (req) => {
     const locality = typeof body.locality === 'string' && body.locality.trim().length > 0
       ? body.locality.trim()
       : null
+    const localDate = typeof body.local_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.local_date)
+      ? body.local_date
+      : new Date().toISOString().slice(0, 10)
 
     if (!userId) {
       return json({ error: 'Missing user_id.' }, 400)
@@ -98,23 +120,37 @@ Deno.serve(async (req) => {
       return json({ error: 'Missing device coordinates for live weather.' }, 400)
     }
 
-    const [outfitsResult, inspirationResult] = await Promise.all([
+    const { data: authData, error: authError } = await supabase.auth.getUser()
+    if (authError) throw authError
+
+    const authenticatedUserId = authData.user?.id ?? userId
+
+    const cachedSuggestion = await fetchDailySuggestion(supabase, authenticatedUserId, localDate)
+    if (cachedSuggestion) {
+      return json(cachedSuggestion)
+    }
+
+    const [outfitsResult, profileResult] = await Promise.all([
       supabase
         .from('outfits')
         .select('id,image_path,caption,categories,weather,occasion,colors')
         .eq('user_id', userId)
         .order('created_at', { ascending: false }),
       supabase
-        .from('inspiration_looks')
-        .select('id,image_url,caption,categories,weather,occasion,colors,gender')
-        .limit(120),
+        .from('profiles')
+        .select('gender')
+        .eq('id', authenticatedUserId)
+        .maybeSingle(),
     ])
 
     if (outfitsResult.error) throw outfitsResult.error
-    if (inspirationResult.error) throw inspirationResult.error
+    if (profileResult.error) throw profileResult.error
+
+    const profile = profileResult.data as ProfileRow | null
+    const preferredInspirationGender = inspirationGenderForProfile(profile?.gender)
+    const inspiration = await fetchInspirationLooks(supabase, preferredInspirationGender)
 
     const outfits = (outfitsResult.data ?? []) as OutfitRow[]
-    const inspiration = (inspirationResult.data ?? []) as InspirationRow[]
 
     if (outfits.length === 0) {
       return json({ error: 'No outfits found for user.' }, 400)
@@ -139,13 +175,17 @@ Deno.serve(async (req) => {
       geminiApiKey,
     )
 
-    return json({
+    const suggestionPayload = {
       left_outfit_id: aiResult.left_outfit_id,
       right_outfit_id: aiResult.right_outfit_id,
       inspiration: aiResult.inspiration,
       weather,
       explanation: aiResult.explanation,
-    })
+    }
+
+    await saveDailySuggestion(supabase, authenticatedUserId, localDate, suggestionPayload)
+
+    return json(suggestionPayload)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('outfit-suggestions failed', error)
@@ -165,6 +205,26 @@ function json(payload: unknown, status = 200) {
 
 function normalize(value: string) {
   return value.trim().toLowerCase()
+}
+
+function inspirationLookGender(look: InspirationRow): 'men' | 'women' | null {
+  const normalizedGender = look.gender ? normalize(look.gender) : ''
+  const normalizedURL = normalize(look.image_url)
+
+  if (normalizedGender.includes('women') || normalizedGender.includes('fem') || normalizedURL.includes('/women/')) {
+    return 'women'
+  }
+
+  if (
+    normalizedGender.includes('men')
+    || normalizedGender.includes('mas')
+    || normalizedGender.includes('male')
+    || normalizedURL.includes('/men/')
+  ) {
+    return 'men'
+  }
+
+  return null
 }
 
 function decodeCaptionTags(caption: string | null): string[] {
@@ -194,6 +254,92 @@ function inspirationTokens(look: InspirationRow): string[] {
     ...(look.occasion ?? []),
     ...(look.colors ?? []),
   ].map(normalize)
+}
+
+function inspirationGenderForProfile(gender: string | null | undefined): 'men' | 'women' | null {
+  if (!gender) return null
+
+  const normalized = normalize(gender)
+  if (normalized.includes('fem')) return 'women'
+  if (normalized.includes('mas') || normalized.includes('men') || normalized.includes('male')) return 'men'
+
+  return null
+}
+
+async function fetchInspirationLooks(
+  supabase: ReturnType<typeof createClient>,
+  preferredGender: 'men' | 'women' | null,
+): Promise<InspirationRow[]> {
+  const columns = 'id,image_url,caption,categories,weather,occasion,colors,gender'
+
+  const { data, error } = await supabase
+    .from('inspiration_looks')
+    .select(columns)
+    .limit(240)
+
+  if (error) throw error
+
+  const looks = (data ?? []) as InspirationRow[]
+  if (!preferredGender) return looks
+
+  return looks.filter((look) => inspirationLookGender(look) === preferredGender)
+}
+
+async function fetchDailySuggestion(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  localDate: string,
+) {
+  const { data, error } = await supabase
+    .from('daily_outfit_suggestions')
+    .select('left_outfit_id,right_outfit_id,inspiration,weather,explanation')
+    .eq('user_id', userId)
+    .eq('local_date', localDate)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+
+  const row = data as DailySuggestionRow
+  return {
+    left_outfit_id: row.left_outfit_id,
+    right_outfit_id: row.right_outfit_id,
+    inspiration: row.inspiration,
+    weather: row.weather,
+    explanation: row.explanation,
+  }
+}
+
+async function saveDailySuggestion(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  localDate: string,
+  suggestion: {
+    left_outfit_id: string
+    right_outfit_id: string
+    inspiration: ShortlistedInspiration
+    weather: WeatherSnapshot
+    explanation: string
+  },
+) {
+  const { error } = await supabase
+    .from('daily_outfit_suggestions')
+    .upsert(
+      {
+        user_id: userId,
+        local_date: localDate,
+        left_outfit_id: suggestion.left_outfit_id,
+        right_outfit_id: suggestion.right_outfit_id,
+        inspiration: suggestion.inspiration,
+        weather: suggestion.weather,
+        explanation: suggestion.explanation,
+      },
+      { onConflict: 'user_id,local_date' },
+    )
+
+  if (error) {
+    console.error('Could not save daily outfit suggestion', error)
+  }
 }
 
 function score(tokens: string[], weatherTags: Set<string>, userVocabulary: Set<string>) {
@@ -361,7 +507,7 @@ async function buildSuggestionsWithGemini(
         contents: [{ parts }],
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: 400,
+          maxOutputTokens: 800,
           responseMimeType: 'application/json',
           responseSchema: {
             type: 'object',
@@ -391,12 +537,8 @@ async function buildSuggestionsWithGemini(
     throw new Error('Gemini returned no content.')
   }
 
-  const parsed = JSON.parse(content) as {
-    left_outfit_id: string
-    right_outfit_id: string
-    inspiration_id: string
-    explanation: string
-  }
+  const parsed = parseGeminiSuggestionPayload(content)
+    ?? fallbackGeminiSuggestionPayload(outfitsWithImages, inspirationShortlist, weather)
 
   const leftOutfit = outfitsWithImages.find((o) => o.id === parsed.left_outfit_id)
     ?? outfitsWithImages[0]
@@ -413,6 +555,44 @@ async function buildSuggestionsWithGemini(
     right_outfit_id: rightOutfit.id,
     inspiration,
     explanation: parsed.explanation,
+  }
+}
+
+function parseGeminiSuggestionPayload(content: string): GeminiSuggestionPayload | null {
+  try {
+    return JSON.parse(content) as GeminiSuggestionPayload
+  } catch {
+    const firstBrace = content.indexOf('{')
+    const lastBrace = content.lastIndexOf('}')
+
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(content.slice(firstBrace, lastBrace + 1)) as GeminiSuggestionPayload
+      } catch {
+        // Fall through to the deterministic fallback below.
+      }
+    }
+
+    console.error('Gemini returned malformed JSON', content)
+    return null
+  }
+}
+
+function fallbackGeminiSuggestionPayload(
+  outfitsWithImages: OutfitWithImage[],
+  inspirationShortlist: ShortlistedInspiration[],
+  weather: WeatherSnapshot,
+): GeminiSuggestionPayload {
+  const leftOutfit = outfitsWithImages[0]
+  const rightOutfit = outfitsWithImages.find((outfit) => outfit.id !== leftOutfit.id) ?? leftOutfit
+  const inspiration = inspirationShortlist[0]
+  const weatherText = weather.tags.length > 0 ? weather.tags.join(', ') : 'the current weather'
+
+  return {
+    left_outfit_id: leftOutfit.id,
+    right_outfit_id: rightOutfit.id,
+    inspiration_id: inspiration.id,
+    explanation: `These picks are based on your closet and ${weatherText}. The inspiration look matches the same style direction while staying aligned with your profile preferences.`,
   }
 }
 

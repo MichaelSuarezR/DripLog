@@ -380,7 +380,8 @@ struct SupabaseSuggestionService: SuggestionServicing {
             userID: user.id,
             latitude: coordinates.coordinate.latitude,
             longitude: coordinates.coordinate.longitude,
-            locality: locality
+            locality: locality,
+            localDate: Self.localDateString()
         )
 
         var request = URLRequest(url: configuration.projectURL.appending(path: "functions/v1/outfit-suggestions"))
@@ -438,6 +439,16 @@ struct SupabaseSuggestionService: SuggestionServicing {
             weather: weather,
             explanation: decoded.explanation
         )
+    }
+
+    private static func localDateString(for date: Date = Date()) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        let year = components.year ?? 1970
+        let month = components.month ?? 1
+        let day = components.day ?? 1
+        return String(format: "%04d-%02d-%02d", year, month, day)
     }
 }
 
@@ -570,12 +581,14 @@ private struct SuggestionFunctionRequest: Encodable {
     let latitude: Double?
     let longitude: Double?
     let locality: String?
+    let localDate: String
 
     enum CodingKeys: String, CodingKey {
         case userID = "user_id"
         case latitude
         case longitude
         case locality
+        case localDate = "local_date"
     }
 }
 
