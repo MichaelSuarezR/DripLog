@@ -70,8 +70,8 @@ struct TutorialOverlay: View {
         .padding(16)
         .frame(width: tooltipWidth)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(red: 0.22, green: 0.33, blue: 0.72).opacity(0.95))
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(Color(red: 0.588, green: 0.678, blue: 0.839).opacity(0.95))
         )
         .position(tooltipPosition)
     }
