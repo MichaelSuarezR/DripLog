@@ -7,193 +7,225 @@ struct SuggestionsView: View {
     let onClose: () -> Void
     let onRetry: () -> Void
 
+    @State private var currentPage = 0
+
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 28) {
-                header
+        VStack(spacing: 0) {
+            header
 
-                if isLoading {
-                    VStack(spacing: 16) {
-                        Spacer()
-                        ProgressView("Building suggestions...")
-                            .font(.headline)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                } else if let errorMessage {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Spacer()
-                        Text(errorMessage)
-                            .font(.headline)
-                            .foregroundStyle(.black)
-                        Button("Try Again") {
-                            onRetry()
-                        }
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(Color.black, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        Spacer()
-                    }
-                    .padding(.horizontal, 24)
-
-                } else if let suggestions {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 22) {
-                            Text("Randomized Outfits")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.black)
-                                .padding(.horizontal, 20)
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 18) {
-                                    closetSuggestionCard(
-                                        imageURL: suggestions.leftOutfit.thumbnailURL,
-                                        title: "Your Closet",
-                                        detail: cardDetail(for: suggestions.leftOutfit.tags)
-                                    )
-                                    inspirationSuggestionCard(look: suggestions.centerInspiration)
-                                    closetSuggestionCard(
-                                        imageURL: suggestions.rightOutfit.thumbnailURL,
-                                        title: "Your Closet",
-                                        detail: cardDetail(for: suggestions.rightOutfit.tags)
-                                    )
-                                }
-                                .padding(.horizontal, 18)
-                            }
-
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("Why it works")
-                                    .font(.system(size: 18, weight: .semibold))
-                                Text(suggestions.explanation)
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.black.opacity(0.68))
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .padding(.horizontal, 20)
-
-                            weatherCard(for: suggestions.weather)
-                                .padding(.horizontal, 20)
-                        }
-                        .padding(.bottom, 40)
-                    }
-                }
+            if isLoading {
+                Spacer()
+                ProgressView("Building suggestions...")
+                    .font(.headline)
+                Spacer()
+            } else if let errorMessage {
+                errorView(message: errorMessage)
+            } else if let suggestions {
+                suggestionContent(suggestions)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.white)
-            .toolbar(.hidden, for: .navigationBar)
         }
+        .background(Color.white)
+        .ignoresSafeArea(edges: .top)
     }
 
     // MARK: - Header
 
     private var header: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 0, style: .continuous)
-                .fill(Color.black.opacity(0.10))
-                .frame(height: 71)
+        HStack(alignment: .bottom, spacing: 0) {
+            Text("Outfits For You")
+                .font(AppFont.uiBold(size: 30))
+                .foregroundStyle(.black)
+            Spacer()
+            Image("RunningFigures")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 64)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 64)
+        .padding(.bottom, 16)
+    }
 
-            HStack {
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle")
-                        .font(.system(size: 21))
-                        .foregroundStyle(.black)
+    // MARK: - Main content
+
+    private func suggestionContent(_ s: OutfitSuggestions) -> some View {
+        VStack(spacing: 0) {
+            // Static outfit cards
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    closetCard(imageURL: s.leftOutfit.imageURL, tags: s.leftOutfit.categories)
+                    inspirationCard(look: s.centerInspiration)
+                    closetCard(imageURL: s.rightOutfit.imageURL, tags: s.rightOutfit.categories)
                 }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Text("Suggestions")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.black)
-
-                Spacer()
-
-                Color.clear
-                    .frame(width: 21, height: 21)
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 16)
+
+            // Swipeable info cards
+            TabView(selection: $currentPage) {
+                whyItWorksCard(explanation: s.explanation)
+                    .padding(.horizontal, 20)
+                    .tag(0)
+
+                weatherContextCard(weather: s.weather)
+                    .padding(.horizontal, 20)
+                    .tag(1)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 200)
+            .clipped()
+            .padding(.top, 20)
+
+            paginationDots
+                .padding(.top, 12)
+
+            Spacer()
+
+            Button(action: onClose) {
+                Text("Done")
+                    .font(AppFont.uiBold(size: 18))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(AppColor.accentOrange, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 40)
+            .padding(.bottom, 40)
+            .padding(.top, 16)
         }
     }
 
-    // MARK: - Cards
+    // MARK: - Outfit cards
 
-    private func closetSuggestionCard(imageURL: URL, title: String, detail: String) -> some View {
-        VStack(spacing: 12) {
+    private func closetCard(imageURL: URL, tags: [String]) -> some View {
+        VStack(alignment: .center, spacing: 10) {
             CachedAsyncImage(url: imageURL) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
+                image.resizable().scaledToFill()
             }
-            .frame(width: 286, height: 376)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .frame(width: 260, height: 320)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .clipped()
 
-            VStack(spacing: 6) {
-                Text(title)
-                    .font(.headline.weight(.semibold))
-                Text(detail)
-                    .font(.footnote)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(Color.black.opacity(0.68))
-                    .frame(width: 250)
+            Text("Your Closet")
+                .font(AppFont.uiBold(size: 14))
+                .foregroundStyle(AppColor.placeholderBlue)
+
+            HStack(spacing: 6) {
+                ForEach(tags.prefix(3), id: \.self) { tag in
+                    Text(tag)
+                        .font(AppFont.uiRegular(size: 12))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(AppColor.placeholderBlue, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
             }
         }
     }
 
-    private func inspirationSuggestionCard(look: InspirationLook) -> some View {
-        VStack(spacing: 12) {
+    private func inspirationCard(look: InspirationLook) -> some View {
+        VStack(alignment: .center, spacing: 10) {
             CachedAsyncImage(url: look.imageURL) { image in
-                image
-                    .resizable()
-                    .scaledToFill()
+                image.resizable().scaledToFill()
             }
-            .frame(width: 286, height: 376)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .frame(width: 260, height: 320)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipped()
 
-            VStack(spacing: 6) {
-                Text("Inspiration")
-                    .font(.headline.weight(.semibold))
-                Text(cardDetail(for: look.categories))
-                    .font(.footnote)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(Color.black.opacity(0.68))
-                    .frame(width: 250)
+            Text("Inspiration")
+                .font(AppFont.uiBold(size: 14))
+                .foregroundStyle(AppColor.placeholderBlue)
+
+            HStack(spacing: 6) {
+                ForEach(look.categories.prefix(3), id: \.self) { tag in
+                    Text(tag)
+                        .font(AppFont.uiRegular(size: 12))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(AppColor.placeholderBlue, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
             }
         }
     }
 
-    private func weatherCard(for weather: WeatherSnapshot) -> some View {
+    // MARK: - Info cards (swipeable)
+
+    private func whyItWorksCard(explanation: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Weather Context")
-                .font(.headline.weight(.semibold))
-            if let locationName = weather.locationName, !locationName.isEmpty {
-                Text(locationName)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.black.opacity(0.55))
-            }
-            Text("\(weather.summary) \(weather.temperatureText)")
-                .font(.footnote)
-                .foregroundStyle(Color.black.opacity(0.68))
-            Text(weather.tags.joined(separator: " • "))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(red: 0.08, green: 0.34, blue: 0.27))
+            Text("Why it works")
+                .font(AppFont.uiBold(size: 16))
+                .foregroundStyle(.white)
+            Text(explanation)
+                .font(AppFont.uiRegular(size: 14))
+                .foregroundStyle(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
         .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(AppColor.placeholderBlue, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: - Helpers
+    private func weatherContextCard(weather: WeatherSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Weather Context")
+                .font(AppFont.uiBold(size: 16))
+                .foregroundStyle(.white)
+            if let location = weather.locationName, !location.isEmpty {
+                Text(location)
+                    .font(AppFont.uiBold(size: 14))
+                    .foregroundStyle(.white)
+            }
+            Text("\(weather.summary) \(weather.temperatureText)")
+                .font(AppFont.uiRegular(size: 14))
+                .foregroundStyle(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                ForEach(weather.tags.prefix(4), id: \.self) { tag in
+                    Text(tag.capitalized)
+                        .font(AppFont.uiRegular(size: 13))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(AppColor.placeholderBlue.opacity(0.6), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(AppColor.placeholderBlue, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
 
-    private func cardDetail(for tags: [String]) -> String {
-        let trimmed = tags
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+    // MARK: - Pagination dots
 
-        if trimmed.isEmpty { return "A clean option from your closet." }
-        return trimmed.prefix(3).joined(separator: " • ")
+    private var paginationDots: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<2, id: \.self) { index in
+                Circle()
+                    .fill(index == currentPage ? Color.black : Color.black.opacity(0.2))
+                    .frame(width: 8, height: 8)
+            }
+        }
+    }
+
+    // MARK: - Error
+
+    private func errorView(message: String) -> some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Text(message)
+                .font(.headline)
+                .foregroundStyle(.black)
+            Button("Try Again", action: onRetry)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Color.black, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            Spacer()
+        }
+        .padding(.horizontal, 24)
     }
 }
