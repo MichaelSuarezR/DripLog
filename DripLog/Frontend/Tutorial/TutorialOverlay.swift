@@ -21,7 +21,6 @@ struct TutorialOverlay: View {
 
         return AnyView(
             ZStack {
-                if showDimming{
                 // Dimming layer
                 Color.black.opacity(0.5)
                     .ignoresSafeArea()
@@ -32,7 +31,6 @@ struct TutorialOverlay: View {
                     SpotlightCutout(rect: frame.insetBy(dx: -14, dy: -14))
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
-                }
                 }
 
                 // Tooltip
