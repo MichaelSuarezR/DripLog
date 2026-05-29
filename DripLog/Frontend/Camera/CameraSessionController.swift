@@ -53,6 +53,30 @@ final class CameraSessionController: NSObject, ObservableObject {
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
+    func flipCamera() {
+        sessionQueue.async {
+            let currentInputs = self.session.inputs.compactMap { $0 as? AVCaptureDeviceInput }
+            guard let currentInput = currentInputs.first else { return }
+
+            let newPosition: AVCaptureDevice.Position = currentInput.device.position == .back ? .front : .back
+            guard
+                let newCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: newPosition),
+                let newInput = try? AVCaptureDeviceInput(device: newCamera)
+            else { return }
+
+            self.session.beginConfiguration()
+            self.session.removeInput(currentInput)
+            if self.session.canAddInput(newInput) {
+                self.session.addInput(newInput)
+            }
+            self.session.commitConfiguration()
+
+            DispatchQueue.main.async {
+                self.isFlashAvailable = newCamera.hasFlash
+            }
+        }
+    }
+
     // MARK: - Session Configuration
 
     private func configureAndStartSession() async {

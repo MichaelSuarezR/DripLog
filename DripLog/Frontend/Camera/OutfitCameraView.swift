@@ -37,7 +37,19 @@ struct OutfitCameraView: View {
                 HStack {
                     circularControlButton(systemImage: "chevron.left") { dismiss() }
                     Spacer()
-                    circularControlButton(systemImage: "ellipsis") {}
+                    Button(action: toggleFlash) {
+                        Circle()
+                            .fill(Color.white.opacity(0.82))
+                            .frame(width: 56, height: 56)
+                            .overlay {
+                                Image(systemName: isFlashEnabled ? "bolt.fill" : "bolt.slash")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(Color.black.opacity(0.78))
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!cameraController.isFlashAvailable || isLoadingLibraryImage)
+                    .opacity(cameraController.isFlashAvailable ? 1 : 0.45)
                 }
                 .padding(.horizontal, 28)
                 .padding(.top, 20)
@@ -52,7 +64,7 @@ struct OutfitCameraView: View {
 
                 HStack {
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        controlCircle(systemImage: "photo.on.rectangle")
+                        controlCircle(systemImage: "rectangle.on.rectangle")
                     }
                     .disabled(isLoadingLibraryImage)
 
@@ -72,23 +84,14 @@ struct OutfitCameraView: View {
 
                     Spacer()
 
-                    Button(action: toggleFlash) {
-                        Circle()
-                            .fill(isFlashEnabled ? Color.white.opacity(0.82) : Color.white.opacity(0.18))
-                            .frame(width: 56, height: 56)
-                            .overlay {
-                                Image(systemName: isFlashEnabled ? "bolt.fill" : "bolt.slash")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(isFlashEnabled ? Color.black.opacity(0.78) : .white)
-                            }
+                    Button(action: { cameraController.flipCamera() }) {
+                        controlCircle(systemImage: "arrow.triangle.2.circlepath.camera")
                     }
                     .buttonStyle(.plain)
-                    .disabled(!cameraController.isFlashAvailable || isLoadingLibraryImage)
-                    .opacity(cameraController.isFlashAvailable ? 1 : 0.45)
+                    .disabled(!cameraController.isReady || isLoadingLibraryImage)
                 }
                 .padding(.horizontal, 26)
                 .padding(.vertical, 22)
-                .background(.ultraThinMaterial, in: Capsule())
                 .padding(.horizontal, 30)
                 .padding(.bottom, 28)
             }
