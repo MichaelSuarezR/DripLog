@@ -68,13 +68,15 @@ struct ProfileTab: View {
                 TutorialOverlay(
                     step: .closetGrid,
                     title: "Your closet",
-                    message: "Every outfit you upload lives here. Use the filter to find exactly what you need.",
+                    message: "View all of your uploaded photos in your closet",
                     anchorFrame: tutorialManager.anchorFrames[.closetGrid]
                 )
                 TutorialOverlay(
                     step: .generateOutfit,
                     title: "Don't know what to wear?",
-                    message: "Tap Generate Outfit and we'll build a look from your closet using AI.",
+                    message: "Press this button whenever you don’t know what to wear! You’ll get:
+                                1 AI-generated outfit suggestion
+                                1 randomly resurfaced outfit from your closet",
                     anchorFrame: tutorialManager.anchorFrames[.generateOutfit]
                 )
             }

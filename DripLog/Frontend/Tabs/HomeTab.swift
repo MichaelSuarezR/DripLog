@@ -110,7 +110,7 @@ struct HomeTab: View {
                 TutorialOverlay(
                     step: .feed,
                     title: "Your feed",
-                    message: "See what friends are wearing, get inspired, and share your own OOTDs here.",
+                    message: "View your posts and your friends’ posts in your feed! Interact with and save outfits you like.",
                     anchorFrame: tutorialManager.anchorFrames[.feed]
                 )
             }

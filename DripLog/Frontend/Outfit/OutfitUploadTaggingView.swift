@@ -52,13 +52,13 @@ struct OutfitUploadTaggingView: View {
                     TutorialOverlay(
                         step: .aiTags,
                         title: "AI does the work",
-                        message: "We scan your photo and suggest tags automatically. Tap any chip to add it.",
+                        message: "Our AI will generate suggested tags for your outfits",
                         anchorFrame: tutorialManager.anchorFrames[.aiTags]
                     )
                     TutorialOverlay(
                         step: .dropdowns,
                         title: "Tag your way",
-                        message: "Use these dropdowns to add category, weather, occasion and colors — makes finding outfits easy later.",
+                        message: "Or use any of these dropdown menus to explore our preset tags",
                         anchorFrame: tutorialManager.anchorFrames[.dropdowns]
                     )
                 }
