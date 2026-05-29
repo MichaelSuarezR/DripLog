@@ -107,14 +107,6 @@ struct HomeTab: View {
             .background(Color.white)
             .toolbar(.hidden, for: .navigationBar)
             .tutorialAnchor(step: .feed)
-            .overlay {
-                TutorialOverlay(
-                    step: .feed,
-                    title: "Your feed",
-                    message: "View your posts and your friends’ posts in your feed! Interact with and save outfits you like.",
-                    anchorFrame: tutorialManager.anchorFrames[.feed]
-                )
-            }
             .task {
                 await loadProfilePhoto()
                 await loadStats()
@@ -145,6 +137,14 @@ struct HomeTab: View {
                     friendsTabToShow = nil
                 }
             }
+        }
+        .overlay {
+            TutorialOverlay(
+                step: .feed,
+                title: "Your feed",
+                message: "View your posts and your friends' posts in your feed! Interact with and save outfits you like.",
+                anchorFrame: tutorialManager.anchorFrames[.feed]
+            )
         }
         .onAppear {
             Task {

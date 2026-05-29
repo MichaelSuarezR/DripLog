@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CustomTabBar: View {
     @Binding var selectedTab: AppTab
+    @EnvironmentObject var tutorial: TutorialManager
 
     private let barWidth: CGFloat = 334
     private let barHeight: CGFloat = 58
@@ -38,10 +39,19 @@ struct CustomTabBar: View {
                     }
             }
             .buttonStyle(.plain)
+
+            // Tutorial dim overlay
+            if tutorial.isActive {
+                RoundedRectangle(cornerRadius: 29, style: .continuous)
+                    .fill(Color.black.opacity(0.5))
+                    .frame(width: barWidth, height: barHeight)
+                    .allowsHitTesting(true)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 19)
     }
+    
 
     private func tabButton(imageName: String, tab: AppTab) -> some View {
         Button {

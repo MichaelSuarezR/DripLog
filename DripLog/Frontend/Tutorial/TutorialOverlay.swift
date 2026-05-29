@@ -10,6 +10,7 @@ struct TutorialOverlay: View {
     let title: String
     let message: String
     let anchorFrame: CGRect?
+    //var showDimming: Bool = true // add this
 
     private let tooltipWidth: CGFloat = 250
 
@@ -20,6 +21,7 @@ struct TutorialOverlay: View {
 
         return AnyView(
             ZStack {
+                if showDimming{
                 // Dimming layer
                 Color.black.opacity(0.5)
                     .ignoresSafeArea()
@@ -27,9 +29,10 @@ struct TutorialOverlay: View {
 
                 // Spotlight cutout
                 if let frame = anchorFrame {
-                    SpotlightCutout(rect: frame.insetBy(dx: -6, dy: -6))
+                    SpotlightCutout(rect: frame.insetBy(dx: -14, dy: -14))
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
+                }
                 }
 
                 // Tooltip
@@ -77,29 +80,33 @@ struct TutorialOverlay: View {
     }
 
     private var tooltipPosition: CGPoint {
-        let screen = UIScreen.main.bounds
-        let tooltipHeight: CGFloat = 150
-        let margin: CGFloat = 20
+    let screen = UIScreen.main.bounds
+    let tooltipHeight: CGFloat = 150
+    let margin: CGFloat = 20
+    let safeTop: CGFloat = 60
 
-        guard let frame = anchorFrame else {
-            return CGPoint(x: screen.midX, y: screen.midY)
-        }
-
-        let x = min(
-            max(tooltipWidth / 2 + margin, frame.midX),
-            screen.width - tooltipWidth / 2 - margin
-        )
-
-        let spaceBelow = screen.height - frame.maxY
-        let y: CGFloat
-        if spaceBelow > tooltipHeight + 32 {
-            y = frame.maxY + 16 + tooltipHeight / 2
-        } else {
-            y = frame.minY - 16 - tooltipHeight / 2
-        }
-
-        return CGPoint(x: x, y: y)
+    guard let frame = anchorFrame else {
+        return CGPoint(x: screen.midX, y: screen.midY)
     }
+
+    let x = min(
+        max(tooltipWidth / 2 + margin, frame.midX),
+        screen.width - tooltipWidth / 2 - margin
+    )
+
+    let spaceBelow = screen.height - frame.maxY
+    var y: CGFloat
+    if spaceBelow > tooltipHeight + 32 {
+        y = frame.maxY + 16 + tooltipHeight / 2
+    } else {
+        y = frame.minY - 16 - tooltipHeight / 2
+    }
+
+    y = max(y, safeTop + tooltipHeight / 2)
+    y = min(y, screen.height - tooltipHeight / 2 - margin)
+
+    return CGPoint(x: x, y: y)
+}
 }
 
 // MARK: - Spotlight Shape
