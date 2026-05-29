@@ -21,6 +21,12 @@ struct FriendsView: View {
     private let actionBlue = Color(hex: 0x43A3C7)
     private let borderColor = Color.black.opacity(0.18)
 
+    init(user: AppUser, initialTab: FriendsTab = .friends, onClose: @escaping () -> Void) {
+        self.user = user
+        self.onClose = onClose
+        _selectedTab = State(initialValue: initialTab)
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             backgroundColor
@@ -334,7 +340,7 @@ struct FriendsView: View {
     }
 }
 
-private enum FriendsTab: CaseIterable, Identifiable {
+enum FriendsTab: CaseIterable, Identifiable {
     case friends
     case friendRequests
     case findFriends

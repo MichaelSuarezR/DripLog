@@ -19,12 +19,13 @@ struct HomeTab: View {
     @State private var authService: AuthServicing?
     @State private var selectedAuthor: FriendProfile?
     @State private var isShowingNotifications = false
+    @State private var friendsTabToShow: FriendsTab?
     private let pageSize = 5
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     socialHeader
 
                     Text("Your Feed")
@@ -139,6 +140,11 @@ struct HomeTab: View {
                     }
                 )
             }
+            .fullScreenCover(item: $friendsTabToShow) { tab in
+                FriendsView(user: user, initialTab: tab) {
+                    friendsTabToShow = nil
+                }
+            }
         }
         .onAppear {
             Task {
@@ -162,30 +168,32 @@ struct HomeTab: View {
 
                 Spacer()
 
-                Button {} label: {
+                Button(action: onProfileTapped) {
                     Image(systemName: "pencil")
                         .font(.system(size: 24, weight: .regular))
                         .foregroundStyle(.black)
                         .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Open profile settings")
             }
             .padding(.top, 0)
 
             VStack(spacing: 8) {
-                Button(action: onProfileTapped) {
-                    FeedProfileAvatar(url: profilePhotoURL)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open profile")
+                FeedProfileAvatar(url: profilePhotoURL)
+                    .accessibilityLabel("Profile photo")
 
                 Text("Welcome, \(displayName)!")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(.black)
 
                 HStack(spacing: 42) {
-                    statBlock(value: stats.followers, label: "Followers")
-                    statBlock(value: stats.following, label: "Following")
+                    statButton(value: stats.followers, label: "Followers") {
+                        friendsTabToShow = .friendRequests
+                    }
+                    statButton(value: stats.following, label: "Following") {
+                        friendsTabToShow = .friends
+                    }
                 }
                 .padding(.top, 8)
             }
@@ -203,6 +211,15 @@ struct HomeTab: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.black)
         }
+    }
+
+    private func statButton(value: Int, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            statBlock(value: value, label: label)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(label)")
     }
 
     private var feedScopeSelector: some View {
@@ -511,6 +528,9 @@ struct FeedPostCard: View {
     let onLikeToggle: () -> Void
     let onBookmarkToggle: () -> Void
 
+    @State private var imageScale: CGFloat = 1
+    @State private var imageZoomAnchor: UnitPoint = .center
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .medium
@@ -573,6 +593,7 @@ struct FeedPostCard: View {
                             image
                                 .resizable()
                                 .scaledToFill()
+                                .scaleEffect(imageScale, anchor: imageZoomAnchor)
                         }
                         .frame(width: proxy.size.width, height: proxy.size.height)
                         .clipped()
@@ -591,7 +612,19 @@ struct FeedPostCard: View {
                 )
             )
             .clipped()
-            .allowsHitTesting(false)
+            .simultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { value in
+                        imageZoomAnchor = value.startAnchor
+                        imageScale = min(max(value.magnification, 1), 4)
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                            imageScale = 1
+                            imageZoomAnchor = .center
+                        }
+                    }
+            )
             .padding(.horizontal, 4)
 
             HStack(alignment: .top) {
@@ -706,7 +739,7 @@ private struct FeedProfileAvatar: View {
                 placeholder
             }
         }
-        .frame(width: 50, height: 50)
+        .frame(width: 86, height: 86)
         .clipShape(Circle())
     }
 

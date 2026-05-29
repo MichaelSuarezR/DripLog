@@ -127,6 +127,7 @@ struct SupabaseFeedService: FeedServicing {
                         .createSignedURL(path: row.imagePath, expiresIn: 3600) else {
                             return nil
                         }
+                    let feedImageURL = signedURL.appendingSupabaseTransform(width: 1200, quality: 85) ?? signedURL
                     let allTags = (row.categories + row.weather + row.occasion + row.colors)
                         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                         .filter { !$0.isEmpty }
@@ -136,7 +137,7 @@ struct SupabaseFeedService: FeedServicing {
                         authorID: row.userID,
                         authorName: profile?.displayName ?? "user",
                         authorAvatarURL: profile?.avatarURL,
-                        imageURL: signedURL,
+                        imageURL: feedImageURL,
                         caption: row.caption,
                         tags: allTags,
                         createdAt: row.createdAt,

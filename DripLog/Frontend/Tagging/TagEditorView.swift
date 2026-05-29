@@ -101,6 +101,7 @@ struct TagEditorView: View {
     @State private var autoTagError: String?
     @State private var notes = ""
     @State private var aiSuggestedChips: [String] = []
+    @State private var selectedAISuggestedChips: Set<String> = []
     @State private var isCustomTagPromptPresented = false
     @State private var customTagDraft = ""
 
@@ -278,14 +279,40 @@ struct TagEditorView: View {
                 .font(AppFont.uiRegular(size: 16))
                 .foregroundStyle(.black)
 
-            HStack(spacing: 10) {
-                AIGlowButton(title: "AI", isLoading: $isAutoTagging) {
-                    guard let heroImage else { return }
-                    await performAutoTag(image: heroImage)
+            if configuration.mode == .outfitUpload || configuration.mode == .onboardingTagging {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 86, maximum: 96), spacing: 8)],
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    if isAutoTagging && aiSuggestedChips.isEmpty {
+                        ForEach(0..<8, id: \.self) { _ in
+                            aiLoadingChip
+                        }
+                    } else {
+                        ForEach(aiSuggestedChips.prefix(8), id: \.self) { chip in
+                            Button {
+                                toggleAISuggestedTag(chip)
+                            } label: {
+                                aiChip(
+                                    label: chip.capitalized,
+                                    isSelected: selectedAISuggestedChips.contains(normalizedTag(chip))
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
+            } else {
+                HStack(spacing: 10) {
+                    AIGlowButton(title: "AI", isLoading: $isAutoTagging) {
+                        guard let heroImage else { return }
+                        await performAutoTag(image: heroImage)
+                    }
 
-                ForEach(aiSuggestedChips.prefix(3), id: \.self) { chip in
-                    aiChip(label: chip)
+                    ForEach(aiSuggestedChips.prefix(3), id: \.self) { chip in
+                        aiChip(label: chip, isSelected: false)
+                    }
                 }
             }
         }
@@ -293,21 +320,50 @@ struct TagEditorView: View {
         .tutorialAnchor(step: .aiTags)
     }
 
-    private func aiChip(label: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "sparkles")
-                .font(.caption2)
-                .foregroundStyle(AppColor.aiChipTint)
-            Text(label)
+    private var aiLoadingChip: some View {
+        HStack(spacing: 5) {
+            ProgressView()
+                .scaleEffect(0.55)
+                .tint(AppColor.loadingBlue)
+
+            Text("Loading")
                 .font(AppFont.uiRegular(size: 12))
                 .foregroundStyle(AppColor.aiChipTint)
         }
-        .padding(.horizontal, 10)
-        .frame(height: 24)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
+        .frame(height: 30)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(AppColor.loadingBlue, lineWidth: 2)
+                .stroke(AppColor.aiChipTint.opacity(0.7), lineWidth: 2)
+        )
+    }
+
+    private func aiChip(label: String, isSelected: Bool) -> some View {
+        HStack(spacing: 4) {
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+            } else {
+                Image(systemName: "sparkles")
+                    .font(.caption2)
+                    .foregroundStyle(AppColor.loadingBlue.opacity(0.7))
+            }
+            Text(label)
+                .font(AppFont.uiRegular(size: 12))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .foregroundStyle(isSelected ? .white : AppColor.aiChipTint)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity)
+        .frame(height: 30)
+        .background(isSelected ? AppColor.placeholderBlue : Color.white, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(isSelected ? AppColor.placeholderBlue : AppColor.aiChipTint, lineWidth: 2)
         )
     }
 
@@ -758,6 +814,13 @@ struct TagEditorView: View {
 
     private func applyAutoTagResult(_ result: OutfitMetadata) {
         let autoFilters = ClosetFilters(metadata: result)
+
+        if configuration.mode == .outfitUpload || configuration.mode == .onboardingTagging {
+            aiSuggestedChips = aiSuggestionTags(from: autoFilters, metadata: result)
+            selectedAISuggestedChips.removeAll()
+            return
+        }
+
         filters.topCategories.formUnion(autoFilters.topCategories)
         filters.bottomCategories.formUnion(autoFilters.bottomCategories)
         filters.outerwearCategories.formUnion(autoFilters.outerwearCategories)
@@ -779,6 +842,67 @@ struct TagEditorView: View {
         if !autoFilters.weather.isEmpty { expandedSections.insert(.weather) }
         if !autoFilters.occasion.isEmpty { expandedSections.insert(.occasion) }
         if !autoFilters.colors.isEmpty { expandedSections.insert(.colors) }
+    }
+
+    private func aiSuggestionTags(from autoFilters: ClosetFilters, metadata: OutfitMetadata) -> [String] {
+        var suggestions: [String] = []
+        suggestions.append(contentsOf: autoFilters.selectedCategories)
+        suggestions.append(contentsOf: ClosetFilters.occasionOptions.filter { autoFilters.occasion.contains($0) })
+        suggestions.append(contentsOf: ClosetFilters.colorOptions.filter { autoFilters.colors.contains($0) })
+        suggestions.append(contentsOf: metadata.customTags)
+
+        if suggestions.count < 4 {
+            suggestions.append(contentsOf: ClosetFilters.weatherOptions.filter { autoFilters.weather.contains($0) })
+        }
+
+        let uniqueSuggestions = Array(NSOrderedSet(array: suggestions.map(normalizedTag))) as? [String] ?? suggestions.map(normalizedTag)
+        return Array(uniqueSuggestions.prefix(8))
+    }
+
+    private func toggleAISuggestedTag(_ tag: String) {
+        let normalized = normalizedTag(tag)
+        if selectedAISuggestedChips.contains(normalized) {
+            selectedAISuggestedChips.remove(normalized)
+            removeSuggestedTag(normalized)
+        } else {
+            selectedAISuggestedChips.insert(normalized)
+            addSuggestedTag(normalized)
+        }
+    }
+
+    private func addSuggestedTag(_ tag: String) {
+        if ClosetCategoryGroup.tops.items.contains(tag) {
+            filters.topCategories.insert(tag)
+        } else if ClosetCategoryGroup.bottoms.items.contains(tag) {
+            filters.bottomCategories.insert(tag)
+        } else if ClosetCategoryGroup.outerwear.items.contains(tag) {
+            filters.outerwearCategories.insert(tag)
+        } else if ClosetCategoryGroup.shoes.items.contains(tag) {
+            filters.shoesCategories.insert(tag)
+        } else if ClosetCategoryGroup.accessories.items.contains(tag) {
+            filters.accessoriesCategories.insert(tag)
+        } else if ClosetFilters.occasionOptions.contains(tag) {
+            filters.occasion.insert(tag)
+        } else if ClosetFilters.colorOptions.contains(tag) {
+            filters.colors.insert(tag)
+        } else {
+            filters.custom.insert(tag)
+        }
+    }
+
+    private func removeSuggestedTag(_ tag: String) {
+        filters.topCategories.remove(tag)
+        filters.bottomCategories.remove(tag)
+        filters.outerwearCategories.remove(tag)
+        filters.shoesCategories.remove(tag)
+        filters.accessoriesCategories.remove(tag)
+        filters.occasion.remove(tag)
+        filters.colors.remove(tag)
+        filters.custom.remove(tag)
+    }
+
+    private func normalizedTag(_ tag: String) -> String {
+        tag.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
 

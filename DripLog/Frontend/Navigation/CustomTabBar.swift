@@ -8,7 +8,7 @@ struct CustomTabBar: View {
     private let selectedBlue = Color(red: 0.60, green: 0.70, blue: 0.88)
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             RoundedRectangle(cornerRadius: 29, style: .continuous)
                 .fill(Color.white)
                 .frame(width: barWidth, height: barHeight)
@@ -26,19 +26,17 @@ struct CustomTabBar: View {
                 selectedTab = .add
             } label: {
                 Circle()
-                    .fill(Color.white)
-                    .frame(width: 66, height: 66)
+                    .fill(Color.black)
+                    .frame(width: 54, height: 54)
                     .overlay {
                         Image("AddTabIcon")
                             .renderingMode(.template)
                             .resizable()
                             .scaledToFit()
                             .frame(width: 26, height: 26)
-                            .foregroundStyle(Color.black)
+                            .foregroundStyle(Color.white)
                     }
-                    .shadow(color: .black.opacity(0.20), radius: 8, x: 0, y: 4)
             }
-            .offset(y: -46)
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
@@ -53,7 +51,7 @@ struct CustomTabBar: View {
                 if selectedTab == tab {
                     Capsule(style: .continuous)
                         .fill(selectedBlue)
-                        .frame(width: 97, height: 42)
+                        .frame(width: 86, height: 42)
                 }
 
                 Image(imageName)

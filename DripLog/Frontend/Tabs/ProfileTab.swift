@@ -74,9 +74,11 @@ struct ProfileTab: View {
                 TutorialOverlay(
                     step: .generateOutfit,
                     title: "Don't know what to wear?",
-                    message: "Press this button whenever you don’t know what to wear! You’ll get:
-                                1 AI-generated outfit suggestion
-                                1 randomly resurfaced outfit from your closet",
+                    message: """
+                    Press this button whenever you don’t know what to wear! You’ll get:
+                    1 AI-generated outfit suggestion
+                    1 randomly resurfaced outfit from your closet
+                    """,
                     anchorFrame: tutorialManager.anchorFrames[.generateOutfit]
                 )
             }
@@ -188,13 +190,6 @@ struct ProfileTab: View {
                             .padding(.top, 6)
                             .padding(.trailing, 6)
                             .zIndex(1)
-                        }
-
-                        if !photo.tags.isEmpty {
-                            Text(photo.tags.joined(separator: ", "))
-                                .font(.caption)
-                                .foregroundStyle(.black.opacity(0.72))
-                                .lineLimit(1)
                         }
                     }
                 }
