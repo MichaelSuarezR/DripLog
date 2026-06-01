@@ -592,8 +592,10 @@ struct FittyAnimationView: View {
 
     var body: some View {
         Image(frameNames[currentFrame])
+            .renderingMode(.template)
             .resizable()
             .aspectRatio(contentMode: .fit)
+            .foregroundStyle(FittyColor.cream)
             .onReceive(timer) { _ in
                 currentFrame = (currentFrame + 1) % frameNames.count
             }
