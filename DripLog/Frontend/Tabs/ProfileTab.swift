@@ -129,6 +129,15 @@ struct ProfileTab: View {
                     )
                 )
             )
+            .overlay(alignment: .trailing) {
+                Image("GenerateOutfitFigure")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 72)
+                    .padding(.trailing, 18)
+                    .allowsHitTesting(false)
+            }
+            .clipShape(Capsule())
             .overlay(
                 TimelineView(.animation) { context in
                     let t = context.date.timeIntervalSinceReferenceDate
