@@ -36,9 +36,7 @@ struct SuggestionsView: View {
                 .font(AppFont.uiBold(size: 30))
                 .foregroundStyle(.black)
             Spacer()
-            Image("RunningFigures")
-                .resizable()
-                .scaledToFit()
+            RunningFiguresView()
                 .frame(height: 64)
         }
         .padding(.horizontal, 20)
@@ -227,5 +225,24 @@ struct SuggestionsView: View {
             Spacer()
         }
         .padding(.horizontal, 24)
+    }
+}
+
+private struct RunningFiguresView: View {
+    private let poses = ["run_pose1", "run_pose2", "run_pose3"]
+    private let frameDuration = 0.18
+
+    var body: some View {
+        TimelineView(.animation) { context in
+            let step = Int(context.date.timeIntervalSinceReferenceDate / frameDuration)
+            HStack(spacing: 2) {
+                ForEach(0..<3, id: \.self) { slot in
+                    Image(poses[(step + slot) % poses.count])
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 52, height: 64)
+                }
+            }
+        }
     }
 }
