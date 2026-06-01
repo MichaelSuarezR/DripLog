@@ -5,6 +5,7 @@
 //  Created by Michael Suarez-Russell on 4/21/26.
 //
 
+import Combine
 import SwiftUI
 import UIKit
 
@@ -83,9 +84,7 @@ struct AuthView: View {
                     .font(FittyFont.logo(size: 50))
                     .foregroundStyle(FittyColor.cream)
 
-                Image("FittyLoadingIllustration")
-                    .resizable()
-                    .scaledToFit()
+                FittyAnimationView()
                     .frame(width: 281, height: 281)
             }
             .offset(y: -24)
@@ -583,6 +582,21 @@ private struct FittyGoogleButtonStyle: ButtonStyle {
             .background(FittyColor.cardWhite, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
             .shadow(color: .black.opacity(0.10), radius: 4, x: 0, y: 4)
             .opacity(configuration.isPressed ? 0.88 : 1)
+    }
+}
+
+struct FittyAnimationView: View {
+    @State private var currentFrame = 0
+    private let frameNames = ["fitty_frame1", "fitty_frame2", "fitty_frame3", "fitty_frame4"]
+    private let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        Image(frameNames[currentFrame])
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .onReceive(timer) { _ in
+                currentFrame = (currentFrame + 1) % frameNames.count
+            }
     }
 }
 

@@ -112,19 +112,40 @@ struct ProfileTab: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .medium))
 
                 Text("Generate Outfit")
-                    .font(AppFont.uiBold(size: 16))
+                    .font(.system(size: 15, weight: .semibold))
             }
-            .foregroundStyle(.black)
+            .foregroundColor(Color(red: 0.55, green: 0.65, blue: 0.82))
+            .padding(.vertical, 14)
+            .padding(.horizontal, 20)
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay {
-                AIRainbowBorderView(cornerRadius: 14, lineWidth: 2.5)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(
+                Capsule().fill(
+                    LinearGradient(
+                        colors: [Color(red: 0.95, green: 0.96, blue: 0.99), .white, Color(red: 0.95, green: 0.96, blue: 0.99)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    )
+                )
+            )
+            .overlay(
+                Capsule().stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.60, green: 0.72, blue: 0.88),
+                            Color(red: 0.85, green: 0.90, blue: 0.97),
+                            .white,
+                            Color(red: 0.85, green: 0.90, blue: 0.97),
+                            Color(red: 0.60, green: 0.72, blue: 0.88)
+                        ],
+                        startPoint: .topLeading, endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+            )
+            .shadow(color: Color(red: 0.60, green: 0.72, blue: 0.88).opacity(0.25), radius: 10, x: 0, y: 2)
+            .contentShape(Capsule())
         }
         .buttonStyle(InspirationBannerButtonStyle())
     }
