@@ -7,6 +7,7 @@ struct ProfileTab: View {
     let outfitPhotos: [OutfitPhoto]
     let isLoadingOutfits: Bool
     let errorMessage: String?
+    let profilePhotoURL: URL?
     let onLogOut: () -> Void
     let onEditOutfit: (OutfitPhoto) -> Void
     let onAskForSuggestions: () -> Void
@@ -18,8 +19,6 @@ struct ProfileTab: View {
 
     @State private var isFilterPresented = false
     @State private var filters = ClosetFilters()
-    @State private var profilePhotoURL: URL?
-    @State private var authService: AuthServicing?
 
     private let columns = [
         GridItem(.flexible(), spacing: 14),
@@ -51,7 +50,6 @@ struct ProfileTab: View {
             .onAppear {
                 Task {
                     await onLoadOutfits()
-                    await loadProfilePhoto()
                 }
             }
             .refreshable {
@@ -226,21 +224,6 @@ struct ProfileTab: View {
             return true
         }
     }
-
-    private func loadProfilePhoto() async {
-        do {
-            profilePhotoURL = try await service().fetchProfilePhotoURL(for: user.id)
-        } catch {
-            profilePhotoURL = nil
-        }
-    }
-
-    private func service() throws -> AuthServicing {
-        if let authService { return authService }
-        let createdService = try SupabaseAuthService()
-        authService = createdService
-        return createdService
-    }
 }
 
 private struct InspirationBannerButtonStyle: ButtonStyle {
@@ -258,13 +241,8 @@ private struct ClosetProfileAvatar: View {
     var body: some View {
         Group {
             if let url {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    default:
-                        placeholder
-                    }
+                CachedAsyncImage(url: url, showsLoadingIndicator: false) { image in
+                    image.resizable().scaledToFill()
                 }
             } else {
                 placeholder

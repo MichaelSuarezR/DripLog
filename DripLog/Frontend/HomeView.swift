@@ -40,6 +40,8 @@ struct HomeView: View {
     @State private var suggestions: OutfitSuggestions?
     @State private var suggestionsLocalDate: String?
     @State private var suggestionErrorMessage: String?
+    @StateObject private var feedStore: FeedStore
+    @StateObject private var profilePhotoStore: ProfilePhotoStore
 
     // MARK: Tutorial state
     @StateObject private var tutorialManager: TutorialManager
@@ -51,6 +53,8 @@ struct HomeView: View {
     self.user = user
     self.onUserUpdated = onUserUpdated
     self.onLogOut = onLogOut
+    _feedStore = StateObject(wrappedValue: FeedStore(userID: user.id))
+    _profilePhotoStore = StateObject(wrappedValue: ProfilePhotoStore(userID: user.id))
     _tutorialManager = StateObject(wrappedValue: TutorialManager(userID: user.id.uuidString))
 }
 
@@ -62,6 +66,10 @@ struct HomeView: View {
             CustomTabBar(selectedTab: $selectedTab)
         }
         .environmentObject(tutorialManager)
+        .task {
+            await profilePhotoStore.loadIfNeeded()
+            await feedStore.loadStatsIfNeeded()
+        }
         .onPreferenceChange(TutorialAnchorKey.self) { anchors in
             for anchor in anchors {
                 tutorialManager.registerFrame(anchor.frame, for: anchor.step)
@@ -96,6 +104,7 @@ struct HomeView: View {
                 onSave: { metadata in
                     let photo = try await service().uploadOutfit(draft.image, metadata: metadata, for: user.id)
                     outfitPhotos.insert(photo, at: 0)
+                    feedStore.invalidateAllScopes()
                     pendingOutfitDraft = nil
                     selectedTab = .closet
                 }
@@ -152,7 +161,15 @@ struct HomeView: View {
                 onRetry: prepareSuggestions
             )
         }
-        .fullScreenCover(isPresented: $isProfilePresented) {
+        .fullScreenCover(
+            isPresented: $isProfilePresented,
+            onDismiss: {
+                Task {
+                    await profilePhotoStore.loadIfNeeded(force: true)
+                    await feedStore.loadStatsIfNeeded(force: true)
+                }
+            }
+        ) {
             UserProfileView(
                 user: user,
                 onUserUpdated: onUserUpdated,
@@ -176,6 +193,7 @@ struct HomeView: View {
                 outfitPhotos: outfitPhotos,
                 isLoadingOutfits: isLoadingOutfits,
                 errorMessage: outfitErrorMessage,
+                profilePhotoURL: profilePhotoStore.url,
                 onLogOut: onLogOut,
                 onEditOutfit: { editingOutfit = $0 },
                 onAskForSuggestions: prepareSuggestions,
@@ -192,6 +210,8 @@ struct HomeView: View {
         case .feed:
             HomeTab(
                 user: user,
+                feedStore: feedStore,
+                profilePhotoURL: profilePhotoStore.url,
                 onProfileTapped: { isProfilePresented = true }
             )
         }
@@ -292,6 +312,7 @@ struct HomeView: View {
                     visibility: metadata.visibility,
                     createdAt: existing.createdAt
                 )
+                feedStore.invalidateAllScopes()
             }
         } catch {
             outfitErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not update outfit details."
@@ -302,6 +323,7 @@ struct HomeView: View {
         do {
             try await service().deleteOutfit(photo)
             outfitPhotos.removeAll { $0.id == photo.id }
+            feedStore.invalidateAllScopes()
             editingOutfit = nil
         } catch {
             outfitErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not delete outfit."
