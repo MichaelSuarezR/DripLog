@@ -110,31 +110,36 @@ struct ProfileTab: View {
         Button {
             onAskForSuggestions()
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 15, weight: .medium))
+            HStack(spacing: 10) {
+                Image("GenerateOutfitSparkle")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
 
                 Text("Generate Outfit")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color(red: 0.588, green: 0.678, blue: 0.839))
+
+                Spacer(minLength: 0)
             }
-            .foregroundColor(Color(red: 0.55, green: 0.65, blue: 0.82))
-            .padding(.vertical, 14)
-            .padding(.horizontal, 20)
+            .padding(.leading, 18)
             .frame(maxWidth: .infinity)
+            .frame(height: 84)
             .background(
                 Capsule().fill(
                     LinearGradient(
-                        colors: [Color(red: 0.95, green: 0.96, blue: 0.99), .white, Color(red: 0.95, green: 0.96, blue: 0.99)],
+                        colors: [Color(red: 0.898, green: 0.922, blue: 0.957), Color(red: 0.945, green: 0.945, blue: 0.945)],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     )
                 )
             )
-            .overlay(alignment: .trailing) {
+            .overlay(alignment: .topTrailing) {
                 Image("GenerateOutfitFigure")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 72)
-                    .padding(.trailing, 18)
+                    .frame(height: 142)
+                    .padding(.top, 6)
+                    .padding(.trailing, 20)
                     .allowsHitTesting(false)
             }
             .clipShape(Capsule())
