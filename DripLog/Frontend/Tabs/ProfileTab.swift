@@ -130,19 +130,24 @@ struct ProfileTab: View {
                 )
             )
             .overlay(
-                Capsule().stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.60, green: 0.72, blue: 0.88),
-                            Color(red: 0.85, green: 0.90, blue: 0.97),
-                            .white,
-                            Color(red: 0.85, green: 0.90, blue: 0.97),
-                            Color(red: 0.60, green: 0.72, blue: 0.88)
-                        ],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
+                TimelineView(.animation) { context in
+                    let t = context.date.timeIntervalSinceReferenceDate
+                    let angle = (t.truncatingRemainder(dividingBy: 8) / 8) * 360
+                    Capsule().strokeBorder(
+                        AngularGradient(
+                            colors: [
+                                Color(red: 0.60, green: 0.72, blue: 0.88),
+                                Color(red: 0.85, green: 0.90, blue: 0.97),
+                                .white,
+                                Color(red: 0.85, green: 0.90, blue: 0.97),
+                                Color(red: 0.60, green: 0.72, blue: 0.88)
+                            ],
+                            center: .center,
+                            angle: .degrees(angle)
+                        ),
+                        lineWidth: 1.5
+                    )
+                }
             )
             .shadow(color: Color(red: 0.60, green: 0.72, blue: 0.88).opacity(0.25), radius: 10, x: 0, y: 2)
             .contentShape(Capsule())
