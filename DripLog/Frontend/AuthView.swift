@@ -92,33 +92,39 @@ struct AuthView: View {
     }
 
     // MARK: - Create account (Figma: 560:551)
+// MARK: - Create account (Figma: 560:551)
 
     private var createAccountView: some View {
         GeometryReader { geo in
             let cardHeight: CGFloat = min(454, geo.size.height * 0.52)
-            let logoAreaHeight: CGFloat = geo.size.height - cardHeight
-
+            
             ZStack(alignment: .bottom) {
+                // Layer 1: Core Cream Background
                 FittyColor.cream
                     .ignoresSafeArea()
 
+                // Layer 2: Branding Header + Illustration (Anchored to the top of the card)
                 VStack(spacing: 0) {
                     Text("Fitty")
                         .font(FittyFont.logo(size: 50))
                         .foregroundStyle(.black)
                         .padding(.top, max(geo.safeAreaInsets.top + 16, 40))
 
-                    let illustrationSize = max(logoAreaHeight - 100, 120)
+                    Spacer()
+                    
+                    // The Illustration sits naturally at the bottom of the cream area
                     Image("FittyCreateAccountIllustration")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: illustrationSize, height: illustrationSize)
-                        .padding(.top, 8)
-
-                    Spacer(minLength: 0)
+                        .frame(width: 260, height: 260)
+                        // This exact offset pushes it down slightly so the white card's 
+                        // curved rim slices perfectly right across the eyes—just like Figma.
+                        .offset(y: 35)
                 }
+                // We push the entire asset stack layout right down to the card line limit
                 .padding(.bottom, cardHeight)
 
+                // Layer 3: Foreground White Action Drawer Card
                 VStack(spacing: 10) {
                     Text("Create Account")
                         .font(FittyFont.uiBold(size: 24))
@@ -146,7 +152,7 @@ struct AuthView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 62)
-                .padding(.top, 36)
+                .padding(.top, 50) // Balanced spacing for content within the card
                 .frame(maxWidth: .infinity)
                 .frame(height: cardHeight)
                 .background(
@@ -163,7 +169,7 @@ struct AuthView: View {
             .ignoresSafeArea(edges: .bottom)
         }
     }
-
+    
     // MARK: - Sign up (Figma: 657:394)
 
     private var signUpView: some View {

@@ -10,7 +10,6 @@ struct TutorialOverlay: View {
     let title: String
     let message: String
     let anchorFrame: CGRect?
-    //var showDimming: Bool = true // add this
 
     private let tooltipWidth: CGFloat = 250
 
@@ -21,16 +20,17 @@ struct TutorialOverlay: View {
 
         return AnyView(
             ZStack {
-                // Dimming layer
-                Color.black.opacity(0.5)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(true)
+                // REMOVED: Standalone dimming layer that was doubling the opacity
 
-                // Spotlight cutout
+                // Spotlight cutout handles both the background dimming AND the clear cutout
                 if let frame = anchorFrame {
                     SpotlightCutout(rect: frame.insetBy(dx: -14, dy: -14))
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
+                } else {
+                    // Fallback dim background if there's no specific element to anchor to
+                    Color.black.opacity(0.65)
+                        .ignoresSafeArea()
                 }
 
                 // Tooltip
@@ -78,33 +78,33 @@ struct TutorialOverlay: View {
     }
 
     private var tooltipPosition: CGPoint {
-    let screen = UIScreen.main.bounds
-    let tooltipHeight: CGFloat = 150
-    let margin: CGFloat = 20
-    let safeTop: CGFloat = 60
+        let screen = UIScreen.main.bounds
+        let tooltipHeight: CGFloat = 150
+        let margin: CGFloat = 20
+        let safeTop: CGFloat = 60
 
-    guard let frame = anchorFrame else {
-        return CGPoint(x: screen.midX, y: screen.midY)
+        guard let frame = anchorFrame else {
+            return CGPoint(x: screen.midX, y: screen.midY)
+        }
+
+        let x = min(
+            max(tooltipWidth / 2 + margin, frame.midX),
+            screen.width - tooltipWidth / 2 - margin
+        )
+
+        let spaceBelow = screen.height - frame.maxY
+        var y: CGFloat
+        if spaceBelow > tooltipHeight + 32 {
+            y = frame.maxY + 16 + tooltipHeight / 2
+        } else {
+            y = frame.minY - 16 - tooltipHeight / 2
+        }
+
+        y = max(y, safeTop + tooltipHeight / 2)
+        y = min(y, screen.height - tooltipHeight / 2 - margin)
+
+        return CGPoint(x: x, y: y)
     }
-
-    let x = min(
-        max(tooltipWidth / 2 + margin, frame.midX),
-        screen.width - tooltipWidth / 2 - margin
-    )
-
-    let spaceBelow = screen.height - frame.maxY
-    var y: CGFloat
-    if spaceBelow > tooltipHeight + 32 {
-        y = frame.maxY + 16 + tooltipHeight / 2
-    } else {
-        y = frame.minY - 16 - tooltipHeight / 2
-    }
-
-    y = max(y, safeTop + tooltipHeight / 2)
-    y = min(y, screen.height - tooltipHeight / 2 - margin)
-
-    return CGPoint(x: x, y: y)
-}
 }
 
 // MARK: - Spotlight Shape
@@ -113,21 +113,19 @@ struct SpotlightCutout: View {
     let rect: CGRect
 
     var body: some View {
-        SpotlightShape(rect: rect)
-            .fill(style: FillStyle(eoFill: true))
-            .foregroundStyle(Color.black.opacity(0.5))
-    }
-}
+        Canvas { context, size in
+            let fullRect = Path(CGRect(origin: .zero, size: size))
+            let spotlight = Path(roundedRect: rect, cornerRadius: 12)
 
-private struct SpotlightShape: Shape {
-    let rect: CGRect
-
-    func path(in bounds: CGRect) -> Path {
-        var path = Rectangle().path(in: UIScreen.main.bounds)
-        path.addRoundedRect(
-            in: rect,
-            cornerSize: CGSize(width: 12, height: 12)
-        )
-        return path
+            // ADJUST HERE: Changed opacity from 0.5 to 0.65 to make the surrounding screen
+            // darker, which makes the bright spotlighted center pop out much more.
+            context.fill(fullRect, with: .color(.black.opacity(0.65)))
+            
+            // This cleanly cuts through the single dark layer above
+            context.blendMode = .clear
+            context.fill(spotlight, with: .color(.black))
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 }
