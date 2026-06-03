@@ -1,7 +1,7 @@
 
 import Foundation
 
-enum OutfitVisibility: CaseIterable {
+enum OutfitVisibility: CaseIterable, Sendable {
     case privateProfile
     case friends
     case publicProfile

@@ -14,7 +14,7 @@ import Supabase
 import UIKit
 import Vision
 
-struct OutfitPhoto: Identifiable {
+struct OutfitPhoto: Identifiable, Sendable {
     let id: UUID
     let imagePath: String
     let imageURL: URL
@@ -34,7 +34,7 @@ struct OutfitPhoto: Identifiable {
     }
 }
 
-struct OutfitMetadata {
+struct OutfitMetadata: Sendable {
     let customTags: [String]
     let categories: [String]
     let weather: [String]
@@ -335,13 +335,29 @@ struct SupabaseOutfitService: OutfitServicing {
         tag.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private static func normalizeTags(_ tags: [String]) -> [String] {
+        var seen: Set<String> = []
+        var normalizedTags: [String] = []
+
+        for tag in tags {
+            let normalized = normalizeTag(tag)
+            guard !normalized.isEmpty else { continue }
+
+            let key = normalized.lowercased()
+            guard seen.insert(key).inserted else { continue }
+            normalizedTags.append(normalized)
+        }
+
+        return normalizedTags
+    }
+
     private static func normalizeMetadata(_ metadata: OutfitMetadata) -> OutfitMetadata {
         OutfitMetadata(
-            customTags: metadata.customTags.map(normalizeTag(_:)).filter { !$0.isEmpty },
-            categories: metadata.categories.map(normalizeTag(_:)).filter { !$0.isEmpty },
-            weather: metadata.weather.map(normalizeTag(_:)).filter { !$0.isEmpty },
-            occasion: metadata.occasion.map(normalizeTag(_:)).filter { !$0.isEmpty },
-            colors: metadata.colors.map(normalizeTag(_:)).filter { !$0.isEmpty },
+            customTags: normalizeTags(metadata.customTags),
+            categories: normalizeTags(metadata.categories),
+            weather: normalizeTags(metadata.weather),
+            occasion: normalizeTags(metadata.occasion),
+            colors: normalizeTags(metadata.colors),
             visibility: metadata.visibility
         )
     }

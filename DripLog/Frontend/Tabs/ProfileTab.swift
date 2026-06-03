@@ -88,14 +88,6 @@ struct ProfileTab: View {
             Spacer()
 
             HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Color.black.opacity(0.14))
-                    .frame(width: 22, height: 22)
-
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(Color.black.opacity(0.14))
-                    .frame(width: 22, height: 22)
-
                 Button(action: onProfileTapped) {
                     ClosetProfileAvatar(url: profilePhotoURL)
                 }

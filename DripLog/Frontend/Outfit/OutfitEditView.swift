@@ -8,6 +8,7 @@ struct OutfitEditView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var filters: ClosetFilters
+    @State private var visibility: OutfitVisibility
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var loadedImage: UIImage?
@@ -30,6 +31,7 @@ struct OutfitEditView: View {
                 visibility: photo.visibility
             )
         ))
+        _visibility = State(initialValue: photo.visibility)
     }
 
     var body: some View {
@@ -38,11 +40,12 @@ struct OutfitEditView: View {
                 configuration: .editTags,
                 filters: $filters,
                 heroImage: loadedImage,
+                visibility: $visibility,
                 leadingHeaderAction: TagEditorHeaderAction(
                     title: "",
                     systemImage: "xmark.circle",
                     isDisabled: isSaving || isDeleting,
-                    handler: saveAndDismiss
+                    handler: closeWithoutSaving
                 ),
                 footer: AnyView(deleteFooter)
             )
@@ -52,23 +55,21 @@ struct OutfitEditView: View {
     }
 
     private var deleteFooter: some View {
-        VStack(spacing: 16) {
-            Divider().overlay(Color.black.opacity(0.4))
-
+        VStack {
             Button(role: .destructive) {
                 deleteOutfit()
             } label: {
                 Text(isDeleting ? "Deleting..." : "Delete outfit")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.black)
-                    .frame(width: 210, height: 34)
-                    .background(Color.black.opacity(0.12), in: Capsule())
+                    .font(AppFont.uiBold(size: 14))
+                    .foregroundStyle(.white)
+                    .frame(width: 174, height: 34)
+                    .background(AppColor.accentOrange, in: Capsule())
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity)
             .disabled(isDeleting || isSaving)
         }
-        .padding(.top, 8)
+        .padding(.top, 28)
     }
 
     private func loadHeroImage() async {
@@ -77,23 +78,17 @@ struct OutfitEditView: View {
         await MainActor.run { loadedImage = image }
     }
 
-    private func saveAndDismiss() {
+    private func closeWithoutSaving() {
         guard !isSaving, !isDeleting else { return }
-        Task {
-            isSaving = true
-            await onClose(filters.metadata)
-            isSaving = false
-            dismiss()
-        }
+        dismiss()
     }
 
     private func deleteOutfit() {
         guard !isDeleting, !isSaving else { return }
+        isDeleting = true
+        dismiss()
         Task {
-            isDeleting = true
             await onDelete()
-            isDeleting = false
-            dismiss()
         }
     }
 }

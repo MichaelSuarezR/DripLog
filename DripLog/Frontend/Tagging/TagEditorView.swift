@@ -55,14 +55,14 @@ struct TagEditorConfiguration {
         mode: .editTags,
         title: "Edit Tags",
         showsRating: false,
-        showsVisibility: false,
-        showsPromptRow: true,
-        showsAISection: true,
-        showsCustomSuggestions: true,
+        showsVisibility: true,
+        showsPromptRow: false,
+        showsAISection: false,
+        showsCustomSuggestions: false,
         showsNotes: true,
         showsAdditionalImages: true,
         showsFooterActions: true,
-        autoTagOnAppear: true
+        autoTagOnAppear: false
     )
 
     static let onboardingTagging = TagEditorConfiguration(
@@ -132,7 +132,7 @@ struct TagEditorView: View {
                     aiSuggestedSection
                 }
 
-                if configuration.mode != .outfitUpload {
+                if configuration.mode == .filter {
                     tagChips
                 }
 
@@ -150,7 +150,7 @@ struct TagEditorView: View {
                     notesSection
                 }
 
-                if configuration.showsVisibility, configuration.mode == .outfitUpload, let visibility {
+                if configuration.showsVisibility, let visibility {
                     visibilitySection(visibility)
                 }
 
@@ -162,7 +162,7 @@ struct TagEditorView: View {
             .padding(.top, configuration.mode == .filter ? 6 : 16)
             .padding(.bottom, 32)
         }
-        .background(Color.white)
+        .background(Color.white.ignoresSafeArea())
         .onAppear {
             if configuration.mode == .filter {
                 expandedSections = [.rating, .categories, .weather]
@@ -179,7 +179,7 @@ struct TagEditorView: View {
     @ViewBuilder
     private var headerBar: some View {
         switch configuration.mode {
-        case .filter, .editTags:
+        case .filter:
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.black.opacity(0.10))
@@ -200,6 +200,30 @@ struct TagEditorView: View {
                 }
                 .padding(.horizontal, 10)
             }
+        case .editTags:
+            ZStack {
+                AppColor.placeholderBlue
+                    .frame(height: 74)
+                    .ignoresSafeArea(edges: .top)
+
+                Text(configuration.title)
+                    .font(AppFont.uiBold(size: 18))
+                    .foregroundStyle(.white)
+
+                HStack {
+                    if let leadingHeaderAction {
+                        headerButton(leadingHeaderAction, foregroundColor: .white)
+                    }
+                    Spacer()
+                    if let trailingHeaderAction {
+                        headerButton(trailingHeaderAction, foregroundColor: .white)
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .padding(.horizontal, -20)
+            .padding(.top, -16)
+            .padding(.bottom, 6)
         case .outfitUpload, .onboardingTagging:
             VStack(spacing: 8) {
                 HStack {
@@ -220,17 +244,17 @@ struct TagEditorView: View {
         }
     }
 
-    private func headerButton(_ action: TagEditorHeaderAction) -> some View {
+    private func headerButton(_ action: TagEditorHeaderAction, foregroundColor: Color = .black) -> some View {
         Button(action: action.handler) {
             Group {
                 if let systemImage = action.systemImage {
                     Image(systemName: systemImage)
                         .font(.title3)
-                        .foregroundStyle(.black)
+                        .foregroundStyle(foregroundColor)
                 } else {
                     Text(action.title)
                         .font(AppFont.uiRegular(size: 16))
-                        .foregroundStyle(.black)
+                        .foregroundStyle(foregroundColor)
                 }
             }
         }
@@ -412,7 +436,11 @@ struct TagEditorView: View {
                 categoriesContent
             }
 
-            if configuration.mode != .outfitUpload {
+            if configuration.mode == .editTags, !expandedSections.contains(.categories) {
+                selectedCategoryPreview
+            }
+
+            if configuration.mode == .filter {
                 section(.weather, title: "Weather", placeholder: "Choose the weather") {
                     TagChipGrid(
                         items: ClosetFilters.weatherOptions,
@@ -423,7 +451,7 @@ struct TagEditorView: View {
                 }
             }
 
-            section(.occasion, title: "Occasion", placeholder: "Choose the occassion") {
+            section(.occasion, title: "Occasion", placeholder: "Choose your occasion") {
                 TagChipGrid(
                     items: ClosetFilters.occasionOptions,
                     selected: $filters.occasion,
@@ -432,38 +460,48 @@ struct TagEditorView: View {
                 )
             }
 
-            section(.colors, title: "Colors", placeholder: "Choose the colors") {
-                if configuration.mode == .outfitUpload {
-                    uploadColorPicker
-                } else {
-                    TagChipGrid(
-                        items: ClosetFilters.colorOptions,
-                        selected: $filters.colors,
-                        showsClearButton: configuration.mode == .filter,
-                        onClear: { filters.colors.removeAll() }
-                    )
-                }
-            }
-
-            section(.custom, title: "Custom", placeholder: "Choose your custom tags") {
-                if configuration.mode == .outfitUpload {
-                    customTagAddButton
-                } else {
-                    TagChipGrid(
-                        items: filters.customSuggestions,
-                        selected: $filters.custom,
-                        showsClearButton: configuration.mode == .filter,
-                        onClear: { filters.custom.removeAll() }
-                    )
-                }
-            }
-
-            if configuration.showsVisibility, configuration.mode != .outfitUpload, let visibility {
-                visibilitySection(visibility)
+            if configuration.mode == .editTags {
+                customSection
+                colorsSection
+            } else {
+                colorsSection
+                customSection
             }
         }
         .padding(.top, configuration.showsPromptRow ? 12 : 0)
         .tutorialAnchor(step: .dropdowns)
+    }
+
+    @ViewBuilder
+    private var colorsSection: some View {
+        section(.colors, title: "Colors", placeholder: "Choose the colors") {
+            if configuration.mode == .outfitUpload || configuration.mode == .editTags {
+                uploadColorPicker
+            } else {
+                TagChipGrid(
+                    items: ClosetFilters.colorOptions,
+                    selected: $filters.colors,
+                    showsClearButton: configuration.mode == .filter,
+                    onClear: { filters.colors.removeAll() }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var customSection: some View {
+        section(.custom, title: "Custom", placeholder: "Choose your custom tags") {
+            if configuration.mode == .outfitUpload || configuration.mode == .editTags {
+                customTagAddButton
+            } else {
+                TagChipGrid(
+                    items: filters.customSuggestions,
+                    selected: $filters.custom,
+                    showsClearButton: configuration.mode == .filter,
+                    onClear: { filters.custom.removeAll() }
+                )
+            }
+        }
     }
 
     private func visibilitySection(_ visibility: Binding<OutfitVisibility>) -> some View {
@@ -489,7 +527,7 @@ struct TagEditorView: View {
             ForEach(ClosetCategoryGroup.allCases) { group in
                 let groupSelection = binding(for: group)
                 VStack(alignment: .leading, spacing: 10) {
-                    TagCategoryGroupChip(title: group.title, isSelected: !groupSelection.wrappedValue.isEmpty)
+                    TagCategoryGroupChip(title: group.title.capitalized, isSelected: !groupSelection.wrappedValue.isEmpty)
                     TagChipGrid(items: group.items, selected: groupSelection)
                 }
             }
@@ -504,6 +542,40 @@ struct TagEditorView: View {
                     .buttonStyle(.plain)
             }
         }
+    }
+
+    @ViewBuilder
+    private var selectedCategoryPreview: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(ClosetCategoryGroup.allCases) { group in
+                let selectedTags = selectedTags(for: group)
+                if !selectedTags.isEmpty {
+                    HStack(alignment: .top, spacing: 14) {
+                        TagCategoryGroupChip(title: group.title.capitalized, isSelected: true)
+
+                        HStack(spacing: 14) {
+                            ForEach(selectedTags, id: \.self) { tag in
+                                Text(tag.capitalized)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .frame(minWidth: 64)
+                                    .frame(height: 24)
+                                    .padding(.horizontal, 10)
+                                    .background(AppColor.placeholderBlue, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.top, -8)
+    }
+
+    private func selectedTags(for group: ClosetCategoryGroup) -> [String] {
+        let selection = binding(for: group).wrappedValue
+        return group.items.filter { selection.contains($0) }
     }
 
     private var uploadColorPicker: some View {
