@@ -22,6 +22,7 @@ struct PendingOutfitDraft: Identifiable {
 
 struct HomeView: View {
     let user: AppUser
+    let shouldRunTutorial: Bool
     let onUserUpdated: (AppUser) -> Void
     let onLogOut: () -> Void
 
@@ -49,8 +50,14 @@ struct HomeView: View {
     @State private var isTutorialTagEditorOpen = false
     @State private var tutorialDidAttemptOpen = false
 
-    init(user: AppUser, onUserUpdated: @escaping (AppUser) -> Void, onLogOut: @escaping () -> Void) {
+    init(
+        user: AppUser,
+        shouldRunTutorial: Bool = false,
+        onUserUpdated: @escaping (AppUser) -> Void,
+        onLogOut: @escaping () -> Void
+    ) {
     self.user = user
+    self.shouldRunTutorial = shouldRunTutorial
     self.onUserUpdated = onUserUpdated
     self.onLogOut = onLogOut
     _feedStore = StateObject(wrappedValue: FeedStore(userID: user.id))
@@ -81,6 +88,7 @@ struct HomeView: View {
         }
         .onChange(of: outfitPhotos.count) { _, count in
             guard
+                shouldRunTutorial,
                 !tutorialDidAttemptOpen,
                 tutorialManager.shouldShow,
                 count > 0

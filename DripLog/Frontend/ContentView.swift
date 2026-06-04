@@ -11,6 +11,7 @@ struct ContentView: View {
     @StateObject private var authViewModel = AuthViewModel()
     @AppStorage("onboardingCompletedFor") private var onboardingCompletedForID = ""
     @State private var splashFinished = false
+    @State private var tutorialEligibleUserID = ""
 
     var body: some View {
         Group {
@@ -26,8 +27,12 @@ struct ContentView: View {
                 } else {
                     HomeView(
                         user: user,
+                        shouldRunTutorial: tutorialEligibleUserID == user.id.uuidString,
                         onUserUpdated: authViewModel.replaceCurrentUser,
-                        onLogOut: authViewModel.logOut
+                        onLogOut: {
+                            tutorialEligibleUserID = ""
+                            authViewModel.logOut()
+                        }
                     )
                 }
             } else {
@@ -45,6 +50,7 @@ struct ContentView: View {
 
     private func markOnboardingComplete(for userID: UUID) {
         onboardingCompletedForID = userID.uuidString
+        tutorialEligibleUserID = userID.uuidString
         authViewModel.completeOnboarding()
     }
 }
